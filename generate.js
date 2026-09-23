@@ -235,11 +235,11 @@ function offsetIndex(grid, index, rowOffset, columnOffset) {
 }
 
 
-function seedState(grid, graph) {
+function seedState(grid, graph, roles) {
     const pattern = graph.rows.join('');
     const cells = Array.from(
         { length: CELL_COUNT },
-        (_, index) => (pattern[index] === 'O' && grid.exists[index] ? spawn(FIRE) : DEAD_CELL)
+        (_, index) => (pattern[index] === 'O' && grid.exists[index] ? spawn(roles.born) : DEAD_CELL)
     );
     return { cells, ages: cells.map(cell => (isAlive(cell) ? 1 : 0)) };
 }
@@ -250,6 +250,12 @@ function seedState(grid, graph) {
 
 function isAlive(cell) {
     return cell.type !== DEAD && cell.shade === 0;
+}
+
+
+function rolesOf(date) {
+    const even = Number(date.slice(8, 10)) % 2 === 0;
+    return { born: even ? ICE : FIRE, mutated: even ? FIRE : ICE };
 }
 
 
@@ -281,27 +287,27 @@ function lifeStep(grid, live) {
 }
 
 
-function evolve(grid, state) {
+function evolve(grid, state, roles) {
     const live = state.cells.map(isAlive);
     const cells = state.cells.map((cell, index) => {
         if (!liveNext(grid, live, index)) {
             return fade(cell);
         }
 
-        return isAlive(cell) ? cell : spawn(FIRE);
+        return isAlive(cell) ? cell : spawn(roles.born);
     });
     const ages = cells.map((cell, index) => (isAlive(cell) ? state.ages[index] + 1 : 0));
     const mutating = ages.flatMap((age, index) => (age === MUTATION_AGE ? [index] : []));
     const doomed = new Set(mutating.length ? stillLifeCells(grid, cells.map(isAlive), mutating) : []);
     for (const index of doomed) {
-        cells[index] = fade(spawn(ICE));
+        cells[index] = fade(spawn(roles.mutated));
         ages[index] = 0;
     }
 
     for (const index of mutating.filter(index => !doomed.has(index))) {
         for (const nearby of [index, ...grid.neighbors[index]]) {
             if (isAlive(cells[nearby])) {
-                cells[nearby] = spawn(ICE);
+                cells[nearby] = spawn(roles.mutated);
             }
         }
     }
@@ -311,6 +317,7 @@ function evolve(grid, state) {
 
 
 function simulateLoop(grid, start, seed, date) {
+    const roles = rolesOf(date);
     const frames = [start];
     let seen = new Set([serialize(start.cells)]);
     let ended = hasEnded(grid, start.cells);
@@ -325,7 +332,7 @@ function simulateLoop(grid, start, seed, date) {
         }
 
         else {
-            state = evolve(grid, frames.at(-1));
+            state = evolve(grid, frames.at(-1), roles);
             if (state.cells.filter(isAlive).length <= POPULATION_FLOOR * grid.dayCount) {
                 state = refill(grid, state, date, refills++);
             }
@@ -348,7 +355,7 @@ function refill(grid, state, date, number) {
     for (let day = 0; day < grid.dayCount; day++) {
         const index = indexOfDay(day);
         if (bytes[day] < REFILL_DENSITY * 256 && !isAlive(cells[index])) {
-            cells[index] = spawn(FIRE);
+            cells[index] = spawn(rolesOf(date).born);
             ages[index] = 1;
         }
     }
@@ -528,7 +535,7 @@ function renderPreviews(grid, graphs, date) {
         `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
         '<style>',
         `.cell { fill: ${EMPTY_LIGHT}; }`,
-        `.live { fill: ${PALETTE[FIRE][0]}; }`,
+        `.live { fill: ${PALETTE[rolesOf(date).born][0]}; }`,
         `text { fill: ${TEXT_LIGHT}; font: 600 13px system-ui, -apple-system, "Segoe UI", sans-serif; }`,
         `@media (prefers-color-scheme: dark) { .cell { fill: ${EMPTY_DARK}; } text { fill: ${TEXT_DARK}; } }`,
         '</style>',
@@ -539,7 +546,7 @@ function renderPreviews(grid, graphs, date) {
 
 
 function renderPreview(grid, graph, date, top) {
-    const seed = seedState(grid, graph);
+    const seed = seedState(grid, graph, rolesOf(date));
     const { refills, restarts } = loopFrames(grid, seed, date);
     const label = `<text x="0" y="${top + 13}">${graph.name} · ${refills} refills, ${restarts} restarts`
         + ` per 60 s loop on this ${grid.dayCount}-day graph</text>`;
@@ -568,9 +575,9 @@ async function main() {
     }
 
     const grid = createGrid(graph.dayCount ?? (COLUMNS - 1) * ROWS + new Date().getUTCDay() + 1);
-    const seed = seedState(grid, graph);
-    const previews = presetNumber ? PRESETS : [graph, ...PRESETS];
     const date = graph.date ?? new Date().toISOString().slice(0, 10);
+    const seed = seedState(grid, graph, rolesOf(date));
+    const previews = presetNumber ? PRESETS : [graph, ...PRESETS];
     const { frames, refills, restarts } = loopFrames(grid, seed, date);
 
     mkdirSync(OUTPUT_DIR, { recursive: true });
