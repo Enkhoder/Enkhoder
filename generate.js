@@ -93,6 +93,8 @@ const OUTPUT_DIR = 'dist';
 const OUTPUT_PATH = `${OUTPUT_DIR}/life.svg`;
 const PREVIEW_PATH = `${OUTPUT_DIR}/configurations.svg`;
 
+const LOOP_ID = 'l';
+
 const DEAD = 0;
 const FIRE = 1;
 const ICE = 2;
@@ -489,23 +491,91 @@ function colorOf(cell) {
 }
 
 
+function seconds(frame) {
+    return +(frame / FRAMES_PER_SECOND).toFixed(4);
+}
+
+
+function loopTime(frame) {
+    return `${LOOP_ID}.begin+${seconds(frame)}`;
+}
+
+
+function preLoopTime(frame, count) {
+    return `${+(seconds(frame) - seconds(count)).toFixed(4)}`;
+}
+
+
+function cellEvents(frames, index) {
+    return frames.flatMap((cells, frame) => {
+        const cell = cells[index];
+        const previous = frames.at(frame - 1)[index];
+        if (cell.type === DEAD || cell.shade > 1 || (cell.shade === 0 && isAlive(previous) && previous.type === cell.type)) {
+            return [];
+        }
+
+        return [{ frame, type: cell.type, birth: cell.shade === 0 }];
+    });
+}
+
+
+function aliveAnimation(events, type, count) {
+    const begins = [];
+    const ends = [];
+    events.forEach((event, i) => {
+        if (!event.birth || event.type !== type) {
+            return;
+        }
+
+        begins.push(loopTime(event.frame));
+        if (i + 1 < events.length) {
+            ends.push(loopTime(events[i + 1].frame));
+            return;
+        }
+
+        begins.unshift(preLoopTime(event.frame, count));
+        ends.push(loopTime(events[0].frame), loopTime(count + events[0].frame));
+    });
+    if (!begins.length) {
+        return [];
+    }
+
+    return [`<set attributeName="fill" to="${PALETTE[type][0]}" begin="${begins.join(';')}" end="${ends.join(';')}"/>`];
+}
+
+
+function trailAnimation(events, type, count) {
+    const deaths = events.filter(event => !event.birth && event.type === type).map(event => event.frame);
+    if (!deaths.length) {
+        return [];
+    }
+
+    const trail = PALETTE[type].slice(1);
+    const carried = deaths.at(-1) + trail.length > count ? [preLoopTime(deaths.at(-1), count)] : [];
+    const begins = [...carried, ...deaths.map(frame => loopTime(frame))];
+    return [
+        `<animate attributeName="fill" values="${trail.join(';')}" dur="${seconds(trail.length)}" calcMode="discrete"`
+        + ` begin="${begins.join(';')}"/>`
+    ];
+}
+
+
 function renderCell(frames, index) {
     const x = (index % COLUMNS) * CELL_PITCH;
     const y = Math.floor(index / COLUMNS) * CELL_PITCH;
     const shape = `x="${x}" y="${y}" width="${CELL_SIZE}" height="${CELL_SIZE}" rx="${CELL_RADIUS}"`;
-    const changes = frames
-        .map((cells, frame) => ({ frame, color: colorOf(cells[index]) }))
-        .filter((change, i, all) => i === 0 || change.color !== all[i - 1].color);
     const base = `<rect class="cell" ${shape} fill="currentColor"/>`;
-    const rect = `<rect ${shape} fill="${changes[0].color}"`;
-    if (changes.length === 1) {
-        return changes[0].color === 'transparent' ? base : `${base}\n${rect}/>`;
+    const colors = frames.map(cells => colorOf(cells[index]));
+    if (colors.every(color => color === colors[0])) {
+        return colors[0] === 'transparent' ? base : `${base}\n<rect ${shape} fill="${colors[0]}"/>`;
     }
 
-    const values = changes.map(change => change.color).join(';');
-    const keyTimes = changes.map(change => +(change.frame / frames.length).toFixed(4)).join(';');
-    return `${base}\n${rect}><animate attributeName="fill" dur="${frames.length / FRAMES_PER_SECOND}s" calcMode="discrete"`
-        + ` values="${values}" keyTimes="${keyTimes}" repeatCount="indefinite"/></rect>`;
+    const events = cellEvents(frames, index);
+    const animations = [FIRE, ICE].flatMap(type => [
+        ...aliveAnimation(events, type, frames.length),
+        ...trailAnimation(events, type, frames.length)
+    ]);
+    return `${base}\n<rect ${shape} fill="transparent">${animations.join('')}</rect>`;
 }
 
 
@@ -519,6 +589,8 @@ function renderSvg(grid, frames) {
         `.cell { color: ${EMPTY_LIGHT}; }`,
         `@media (prefers-color-scheme: dark) { .cell { color: ${EMPTY_DARK}; } }`,
         '</style>',
+        `<rect width="0" height="0"><set id="${LOOP_ID}" attributeName="x" to="0" dur="${seconds(frames.length)}s"`
+        + ` begin="0s;${LOOP_ID}.end"/></rect>`,
         ...cells,
         '</svg>'
     ].join('\n');
