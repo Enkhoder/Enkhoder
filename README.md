@@ -1,4 +1,4 @@
-## Hi there 👋
+<p align="center"><img src="dist/life.svg" alt="Game of Life on my contribution graph"></p>
 
 <!--
 **Enkhoder/Enkhoder** is a ✨ _special_ ✨ repository because its `README.md` (this file) appears on your GitHub profile.
