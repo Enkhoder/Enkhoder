@@ -5,75 +5,12 @@ import { createHash } from 'node:crypto';
 
 //////// CONSTANTS ////////
 
-const PRESETS = [
-    {
-        name: 'Spread 1 · 51 cells',
-        rows: [
-            '...O...O..O..........O.......OO................O.....',
-            '...........O......O....O.....O........OO..OO....O....',
-            'O......O.....O..............OO......O.......O....O...',
-            'O.O.........................................O........',
-            '...............OO...O....O...O...OO.O....O.......O.O.',
-            '...O.............O.O..O.....O...OO..O..............O.',
-            '........O............O......................O......O.'
-        ]
-    },
-    {
-        name: 'Spread 2 · 60 cells',
-        rows: [
-            '...................O....O....................O...O...',
-            '..................OOO....O.O......O.......O.....O....',
-            '...OO......O.....O...O......OO....O......O...........',
-            '....O...O....O.....O...O.O.....O.O............O......',
-            '.O....O...................OO..........O.O.O.....O.O..',
-            '.O.O......O...O.O.......O.....OO.......O.O..O....O...',
-            '......O.OO......O.....................O.....O.O.O.O..'
-        ]
-    },
-    {
-        name: 'Spread 3 · 72 cells',
-        rows: [
-            '..O..O..O...........O.....O..OO.O.......O..O..O......',
-            'OO....OO....O...O....O....O..O......O..O...O.....O...',
-            '......O...O.....O..............OO.O...O....O....OOO..',
-            '....O...OO.........O.............OO.O..O.......OO....',
-            'O..O.................................O...O.OO......O.',
-            '.O....O.......O..O.O.........O....OO.O...O.O.........',
-            '.........O....O...O....O.O......OO..O...........O....'
-        ]
-    },
-    {
-        name: 'Spread 4 · 75 cells',
-        rows: [
-            '....OO.O.........O................O........O.....O.O.',
-            '...O.....O..O.....OO...O.O...O..O........O..O........',
-            '.O..O..............O..OOO.O........OO.O......O....O..',
-            '.......O.O..O.O.....OO.......O......O.O........O.....',
-            '.....O....O.O...OO....O.....O..O......O......O.O.OO..',
-            '......O....O..O...OO.....O........O....O..OO.O...O...',
-            '...............O........O.O.OO...O........OOO........'
-        ]
-    },
-    {
-        name: 'Spread 5 · 39 cells',
-        rows: [
-            '..........O.........O..O......................O.O....',
-            '..O.O.................O..O.O......O.............OO...',
-            '............O........O......O....O.O.O..........O....',
-            '.........O...O......O..........O.....................',
-            '...............O......O............O.................',
-            '.....O......O............O.O........O..........O...O.',
-            '....O....O..................O...........O.O..........'
-        ]
-    }
-];
-
 const ROWS = 7;
 const COLUMNS = 53;
 const CELL_COUNT = ROWS * COLUMNS;
 
-const FRAMES_PER_SECOND = 15;
-const LOOP_FRAMES = 60 * FRAMES_PER_SECOND;
+const FPS = 15;
+const LOOP_FRAMES = 60 * FPS;
 
 const CELL_SIZE = 10;
 const CELL_GAP = 3;
@@ -393,7 +330,7 @@ function restartState(seed, end) {
 
 function loopFrames(grid, seed, date) {
     let start = seed;
-    for (;;) {
+    for (; ;) {
         const loop = simulateLoop(grid, start, seed, date);
         const next = restartState(seed, loop.frames.at(-1));
         if (fingerprint(next.cells) === fingerprint(start.cells)) {
@@ -492,7 +429,7 @@ function colorOf(cell) {
 
 
 function seconds(frame) {
-    return +(frame / FRAMES_PER_SECOND).toFixed(4);
+    return +(frame / FPS).toFixed(4);
 }
 
 
@@ -640,16 +577,11 @@ function renderPreview(grid, graph, date, top) {
 //////// MAIN CONTROL FLOW ////////
 
 async function main() {
-    const presetNumber = process.argv[2];
-    const graph = presetNumber ? PRESETS[Number(presetNumber) - 1] : await contributionGraph(GITHUB_USER);
-    if (!graph) {
-        throw new Error(`Usage: node generate.js [preset 1-${PRESETS.length}]`);
-    }
-
-    const grid = createGrid(graph.dayCount ?? (COLUMNS - 1) * ROWS + new Date().getUTCDay() + 1);
-    const date = graph.date ?? new Date().toISOString().slice(0, 10);
+    const graph = await contributionGraph(GITHUB_USER);
+    const grid = createGrid(graph.dayCount);
+    const date = graph.date;
     const seed = seedState(grid, graph, rolesOf(date));
-    const previews = presetNumber ? PRESETS : [graph, ...PRESETS];
+    const previews = [graph];
     const { frames, refills, restarts } = loopFrames(grid, seed, date);
 
     mkdirSync(OUTPUT_DIR, { recursive: true });
@@ -657,7 +589,7 @@ async function main() {
     writeFileSync(PREVIEW_PATH, renderPreviews(grid, previews, date));
     console.log(
         `Wrote ${OUTPUT_PATH} (${graph.name}): `
-        + `${frames.length}-frame loop (${frames.length / FRAMES_PER_SECOND} s), ${refills} refills, ${restarts} restarts`
+        + `${frames.length}-frame loop (${frames.length / FPS} s), ${refills} refills, ${restarts} restarts`
     );
     console.log(`Wrote ${PREVIEW_PATH}: ${previews.length} graphs on a ${grid.dayCount}-day board`);
 }
