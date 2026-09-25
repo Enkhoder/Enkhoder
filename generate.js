@@ -43,6 +43,9 @@ const REFILL_DENSITY = 0.1;
 
 const GITHUB_USER = 'Enkhoder';
 
+const PUBLISH_SECOND = Math.floor(Date.now() / 1000);
+const ICE_DOMINANT = isPrime(PUBLISH_SECOND);
+
 const GRADIENT_START = [(360 + 50) / 360, 0.5, 0.62];
 const GRADIENT_END = [350 / 360, 0.6, 0.62];
 const GRADIENT_LENGTH = 6;
@@ -192,9 +195,23 @@ function isAlive(cell) {
 }
 
 
-function rolesOf(date) {
-    const even = Number(date.slice(8, 10)) % 2 === 0;
-    return { born: even ? ICE : FIRE, mutated: even ? FIRE : ICE };
+function isPrime(number) {
+    if (number < 2) {
+        return false;
+    }
+
+    for (let divisor = 2; divisor * divisor <= number; divisor++) {
+        if (number % divisor === 0) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
+function rolesOf() {
+    return { born: ICE_DOMINANT ? ICE : FIRE, mutated: ICE_DOMINANT ? FIRE : ICE };
 }
 
 
@@ -256,7 +273,7 @@ function evolve(grid, state, roles) {
 
 
 function simulateLoop(grid, start, seed, date) {
-    const roles = rolesOf(date);
+    const roles = rolesOf();
     const frames = [start];
     let seen = new Set([serialize(start.cells)]);
     let ended = hasEnded(grid, start.cells);
@@ -294,7 +311,7 @@ function refill(grid, state, date, number) {
     for (let day = 0; day < grid.dayCount; day++) {
         const index = indexOfDay(day);
         if (bytes[day] < REFILL_DENSITY * 256 && !isAlive(cells[index])) {
-            cells[index] = spawn(rolesOf(date).born);
+            cells[index] = spawn(rolesOf().born);
             ages[index] = 1;
         }
     }
@@ -521,7 +538,8 @@ function renderSvg(grid, frames) {
     const height = ROWS * CELL_PITCH - CELL_GAP;
     const cells = grid.exists.flatMap((exists, index) => (exists ? [renderCell(frames, index)] : []));
     return [
-        `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"`
+        + ` data-epoch="${PUBLISH_SECOND}">`,
         '<style>',
         `.cell { color: ${EMPTY_LIGHT}; }`,
         `@media (prefers-color-scheme: dark) { .cell { color: ${EMPTY_DARK}; } }`,
@@ -544,7 +562,7 @@ function renderPreviews(grid, graphs, date) {
         `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
         '<style>',
         `.cell { fill: ${EMPTY_LIGHT}; }`,
-        `.live { fill: ${PALETTE[rolesOf(date).born][0]}; }`,
+        `.live { fill: ${PALETTE[rolesOf().born][0]}; }`,
         `text { fill: ${TEXT_LIGHT}; font: 600 13px system-ui, -apple-system, "Segoe UI", sans-serif; }`,
         `@media (prefers-color-scheme: dark) { .cell { fill: ${EMPTY_DARK}; } text { fill: ${TEXT_DARK}; } }`,
         '</style>',
@@ -555,7 +573,7 @@ function renderPreviews(grid, graphs, date) {
 
 
 function renderPreview(grid, graph, date, top) {
-    const seed = seedState(grid, graph, rolesOf(date));
+    const seed = seedState(grid, graph, rolesOf());
     const { refills, restarts } = loopFrames(grid, seed, date);
     const label = `<text x="0" y="${top + 13}">${graph.name} · ${refills} refills, ${restarts} restarts`
         + ` per 60 s loop on this ${grid.dayCount}-day graph</text>`;
@@ -580,7 +598,7 @@ async function main() {
     const graph = await contributionGraph(GITHUB_USER);
     const grid = createGrid(graph.dayCount);
     const date = graph.date;
-    const seed = seedState(grid, graph, rolesOf(date));
+    const seed = seedState(grid, graph, rolesOf());
     const previews = [graph];
     const { frames, refills, restarts } = loopFrames(grid, seed, date);
 
@@ -589,7 +607,8 @@ async function main() {
     writeFileSync(PREVIEW_PATH, renderPreviews(grid, previews, date));
     console.log(
         `Wrote ${OUTPUT_PATH} (${graph.name}): `
-        + `${frames.length}-frame loop (${frames.length / FPS} s), ${refills} refills, ${restarts} restarts`
+        + `${frames.length}-frame loop (${frames.length / FPS} s), ${refills} refills, ${restarts} restarts, `
+        + `${ICE_DOMINANT ? 'ice' : 'fire'}-dominant`
     );
     console.log(`Wrote ${PREVIEW_PATH}: ${previews.length} graphs on a ${grid.dayCount}-day board`);
 }
