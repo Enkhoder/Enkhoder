@@ -1,11 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="686" height="114" viewBox="0 0 686 114">
 <style>
 .cell { fill: #EFF2F5; }
-.live { fill: #27A691; }
+.live { fill: #CEB430; }
 text { fill: #1F2328; font: 600 13px system-ui, -apple-system, "Segoe UI", sans-serif; }
 @media (prefers-color-scheme: dark) { .cell { fill: #151B23; } text { fill: #E6EDF3; } }
 </style>
-<text x="0" y="13">My graph · 20 active days · 53 refills, 0 restarts per 60 s loop on this 369-day graph</text>
+<text x="0" y="13">My graph · 20 active days · 52 refills, 0 restarts per 60 s loop on this 370-day graph</text>
 <rect class="cell" x="0" y="26" width="10" height="10" rx="2"/>
 <rect class="cell" x="13" y="26" width="10" height="10" rx="2"/>
 <rect class="cell" x="26" y="26" width="10" height="10" rx="2"/>
@@ -323,6 +323,7 @@ text { fill: #1F2328; font: 600 13px system-ui, -apple-system, "Segoe UI", sans-
 <rect class="cell" x="637" y="91" width="10" height="10" rx="2"/>
 <rect class="live" x="650" y="91" width="10" height="10" rx="2"/>
 <rect class="cell" x="663" y="91" width="10" height="10" rx="2"/>
+<rect class="cell" x="676" y="91" width="10" height="10" rx="2"/>
 <rect class="cell" x="0" y="104" width="10" height="10" rx="2"/>
 <rect class="cell" x="13" y="104" width="10" height="10" rx="2"/>
 <rect class="cell" x="26" y="104" width="10" height="10" rx="2"/>
