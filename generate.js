@@ -43,8 +43,8 @@ const REFILL_DENSITY = 0.1;
 
 const GITHUB_USER = 'Enkhoder';
 
-const PUBLISH_SECOND = Math.floor(Date.now() / 1000);
-const ICE_DOMINANT = isPrime(PUBLISH_SECOND);
+const PUBLISH_MS = Date.now();
+const ICE_DOMINANT = isPrime(PUBLISH_MS);
 
 const GRADIENT_START = [(360 + 50) / 360, 0.5, 0.62];
 const GRADIENT_END = [350 / 360, 0.6, 0.62];
@@ -539,7 +539,7 @@ function renderSvg(grid, frames) {
     const cells = grid.exists.flatMap((exists, index) => (exists ? [renderCell(frames, index)] : []));
     return [
         `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"`
-        + ` data-epoch="${PUBLISH_SECOND}">`,
+        + ` data-epoch="${PUBLISH_MS}">`,
         '<style>',
         `.cell { color: ${EMPTY_LIGHT}; }`,
         `@media (prefers-color-scheme: dark) { .cell { color: ${EMPTY_DARK}; } }`,
