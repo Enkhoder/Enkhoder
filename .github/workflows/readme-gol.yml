@@ -23,3 +23,31 @@ jobs:
           git add dist/
           git diff --cached --quiet || git commit -m "chore: regenerate life.svg"
           git push
+      - env:
+          ARCHIVE_DEPLOY_KEY: ${{ secrets.ARCHIVE_DEPLOY_KEY }}
+        run: |
+          epoch=$(grep -o 'data-epoch="[0-9]*"' dist/life.svg | grep -o '[0-9]\+')
+          name=$(date -u -d "@$epoch" +%Y%m%d_%H%M%S)
+          mkdir -p ~/.ssh
+          printf '%s\n' "$ARCHIVE_DEPLOY_KEY" > ~/.ssh/archive_key
+          chmod 600 ~/.ssh/archive_key
+          echo "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" >> ~/.ssh/known_hosts
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/archive_key -o IdentitiesOnly=yes"
+          git clone -q --depth 1 git@github.com:Enkhoder/GOL-contrib-graph-archive.git "$RUNNER_TEMP/archive"
+          cd "$RUNNER_TEMP/archive"
+          mkdir -p archive
+          if compgen -G "archive/${name}*.svg" > /dev/null; then
+            echo "$name already archived"
+            exit 0
+          fi
+
+          if [ "$(factor "$epoch" | wc -w)" -eq 2 ]; then
+            name="${name}_Prime_$(( $(find archive -name '*_Prime_*.svg' | wc -l) + 1 ))"
+          fi
+
+          cp "$GITHUB_WORKSPACE/dist/life.svg" "archive/$name.svg"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "archive/$name.svg"
+          git commit -m "archive $name"
+          git push
