@@ -29,9 +29,9 @@ jobs:
         run: |
           epoch=$(grep -o 'data-epoch="[0-9]*"' dist/life.svg | grep -o '[0-9]\+')
           name=$(date -u -d "@$((PUSHED_AT / 1000))" +%Y%m%d_%H%M%S)
-          delay=$((PUSHED_AT - epoch))
-          sign=${delay%%[0-9]*}
-          delay=$(printf '%s%d.%03ds' "$sign" $((${delay#-} / 1000)) $((${delay#-} % 1000)))
+          delayMs=$((PUSHED_AT - epoch))
+          sign=${delayMs%%[0-9]*}
+          delay=$(printf '%s%d.%03ds' "$sign" $((${delayMs#-} / 1000)) $((${delayMs#-} % 1000)))
           mkdir -p ~/.ssh
           printf '%s\n' "$ARCHIVE_DEPLOY_KEY" > ~/.ssh/archive_key
           chmod 600 ~/.ssh/archive_key
@@ -49,7 +49,7 @@ jobs:
             name="${name}_Prime_$(( $(find archive -name '*_Prime_*.svg' | wc -l) + 1 ))"
           fi
 
-          cp "$GITHUB_WORKSPACE/dist/life.svg" "archive/$name.svg"
+          sed "1s/ data-epoch=\"$epoch\"/& data-delay=\"$delayMs\"/" "$GITHUB_WORKSPACE/dist/life.svg" > "archive/$name.svg"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "archive/$name.svg"
