@@ -56,6 +56,20 @@ button:disabled {
     cursor: default;
 }
 
+button[aria-pressed="true"] {
+    border-color: #CEB430;
+}
+
+#speed {
+    width: 260px;
+    accent-color: #CEB430;
+}
+
+#fps {
+    min-width: 64px;
+    font-variant-numeric: tabular-nums;
+}
+
 #status {
     margin-left: auto;
     color: #8B949E;
@@ -82,9 +96,15 @@ button:disabled {
     <button id="play">Pause</button>
     <button id="reseed">Reseed</button>
     <button id="draw">Draw</button>
+    <button id="live" aria-pressed="false">Live draw: Off</button>
     <button id="roles">Fire</button>
     <button id="clear" hidden>Clear</button>
     <span id="status"></span>
+</div>
+<div class="controls">
+    <label for="speed">Speed</label>
+    <input type="range" id="speed" min="1" max="300">
+    <span id="fps"></span>
 </div>
 
 
@@ -98,9 +118,9 @@ const ROWS = 7;
 const COLUMNS = 53;
 const CELL_COUNT = ROWS * COLUMNS;
 
-const GENERATIONS_PER_SECOND = 15;
-const FRAME_MS = 1000 / GENERATIONS_PER_SECOND;
-const LOOP_FRAMES = 60 * GENERATIONS_PER_SECOND;
+const FPS = 30;
+const LOOP_SECONDS = 60;
+const MAX_STEPS_PER_FRAME = 16;
 
 const CELL_SIZE = 10;
 const CELL_GAP = 3;
@@ -212,8 +232,12 @@ let graphRows = null;
 let rolesFlipped = false;
 let lastEnd = '';
 let timer = 0;
+let fps = FPS;
+let lastTime = 0;
+let pendingSteps = 0;
 
 let drawing = false;
+let liveDrawing = false;
 let painting = false;
 let paintAlive = false;
 
@@ -221,7 +245,10 @@ const canvas = document.getElementById('board');
 const context = canvas.getContext('2d');
 const playButton = document.getElementById('play');
 const drawButton = document.getElementById('draw');
+const liveButton = document.getElementById('live');
 const clearButton = document.getElementById('clear');
+const speedInput = document.getElementById('speed');
+const fpsText = document.getElementById('fps');
 const rolesButton = document.getElementById('roles');
 const statusText = document.getElementById('status');
 
@@ -399,7 +426,7 @@ function evolve(source, target) {
 
 
 function step() {
-    if (loopFrame + 1 >= LOOP_FRAMES) {
+    if (loopFrame + 1 >= LOOP_SECONDS * fps) {
         setLoopDate();
         for (let index = 0; index < CELL_COUNT; index++) {
             initial[index] = isAlive(initial[index]) ? spawn(bornType) : 0;
@@ -658,8 +685,8 @@ function draw() {
         }
     }
 
-    const note = drawing ? 'Drawing' : endReason ? `${endReason}, restarting` : lastEnd && `last restart: ${lastEnd}`;
-    const clock = `${(loopFrame / GENERATIONS_PER_SECOND).toFixed(1)} / 60s`;
+    const note = drawing ? 'Drawing' : endReason ? `${endReason}, restarting` : lastEnd && `Last restart: ${lastEnd}`;
+    const clock = `${(loopFrame / fps).toFixed(1)} / ${LOOP_SECONDS}s`;
     const counts = `<span class="fire">Fire ${fire}</span> · <span class="ice">Ice ${ice}</span>`;
     statusText.innerHTML = `Gen ${loopFrame + 1} · ${counts} · ${clock} · Refills ${refills}${note ? ` · ${note}` : ''}`;
 }
@@ -673,7 +700,15 @@ function setDrawing(value) {
     drawButton.textContent = value ? 'Submit' : 'Draw';
     clearButton.hidden = !value;
     playButton.disabled = value;
-    canvas.classList.toggle('drawing', value);
+    canvas.classList.toggle('drawing', drawing || liveDrawing);
+}
+
+
+function toggleLiveDrawing() {
+    liveDrawing = !liveDrawing;
+    liveButton.textContent = `Live draw: ${liveDrawing ? 'On' : 'Off'}`;
+    liveButton.setAttribute('aria-pressed', String(liveDrawing));
+    canvas.classList.toggle('drawing', drawing || liveDrawing);
 }
 
 
@@ -738,13 +773,17 @@ function paint(event) {
 
     current[index] = paintAlive ? spawn(bornType) : 0;
     ages[index] = paintAlive ? 1 : 0;
+    if (!drawing) {
+        resetHistory();
+    }
+
     draw();
 }
 
 
 function startPainting(event) {
     const index = cellFromPointer(event);
-    if (!drawing || index < 0) {
+    if (!(drawing || liveDrawing) || index < 0) {
         return;
     }
 
@@ -794,9 +833,20 @@ function applyContributions(contributions) {
 
 //////// MAIN CONTROL FLOW ////////
 
-function tick() {
-    step();
-    draw();
+function frame(time) {
+    pendingSteps = Math.min(pendingSteps + (time - lastTime) * fps / 1000, MAX_STEPS_PER_FRAME);
+    lastTime = time;
+    const steps = Math.floor(pendingSteps);
+    pendingSteps -= steps;
+    for (let i = 0; i < steps; i++) {
+        step();
+    }
+
+    if (steps) {
+        draw();
+    }
+
+    timer = requestAnimationFrame(frame);
 }
 
 
@@ -805,15 +855,25 @@ function play() {
         return;
     }
 
-    timer = setInterval(tick, FRAME_MS);
+    lastTime = performance.now();
+    pendingSteps = 0;
+    timer = requestAnimationFrame(frame);
     playButton.textContent = 'Pause';
 }
 
 
 function pause() {
-    clearInterval(timer);
+    cancelAnimationFrame(timer);
     timer = 0;
     playButton.textContent = 'Play';
+}
+
+
+function setSpeed(value) {
+    fps = value;
+    speedInput.value = value;
+    fpsText.textContent = `${value} fps`;
+    draw();
 }
 
 
@@ -830,7 +890,9 @@ playButton.addEventListener('click', () => (timer ? pause() : play()));
 document.getElementById('reseed').addEventListener('click', reseed);
 rolesButton.addEventListener('click', toggleRoles);
 drawButton.addEventListener('click', () => (drawing ? submitDrawing() : startDrawing()));
+liveButton.addEventListener('click', toggleLiveDrawing);
 clearButton.addEventListener('click', clearBoard);
+speedInput.addEventListener('input', () => setSpeed(Number(speedInput.value)));
 canvas.addEventListener('pointerdown', startPainting);
 canvas.addEventListener('pointermove', event => (painting ? paint(event) : undefined));
 canvas.addEventListener('pointerup', () => (painting = false));
@@ -838,6 +900,7 @@ canvas.addEventListener('pointercancel', () => (painting = false));
 
 applyDayCount((COLUMNS - 1) * ROWS + new Date().getUTCDay() + 1);
 setupCanvas();
+setSpeed(FPS);
 reseed();
 loadContributions();
 setInterval(loadContributions, REFRESH_MS);
