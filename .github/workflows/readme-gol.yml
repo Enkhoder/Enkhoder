@@ -30,7 +30,8 @@ jobs:
           epoch=$(grep -o 'data-epoch="[0-9]*"' dist/life.svg | grep -o '[0-9]\+')
           name=$(date -u -d "@$((PUSHED_AT / 1000))" +%Y%m%d_%H%M%S)
           delay=$((PUSHED_AT - epoch))
-          delay=$(printf '%d.%03ds' $((delay / 1000)) $((delay % 1000)))
+          sign=${delay%%[0-9]*}
+          delay=$(printf '%s%d.%03ds' "$sign" $((${delay#-} / 1000)) $((${delay#-} % 1000)))
           mkdir -p ~/.ssh
           printf '%s\n' "$ARCHIVE_DEPLOY_KEY" > ~/.ssh/archive_key
           chmod 600 ~/.ssh/archive_key
