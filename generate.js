@@ -333,7 +333,7 @@ function hashBytes(text, count) {
 function hasEnded(grid, cells) {
     const live = cells.map(isAlive);
     const liveCount = live.filter(Boolean).length;
-    return liveCount === 0 || settledGroups(grid, live).flat().length === liveCount;
+    return liveCount > 0 && settledGroups(grid, live).flat().length === liveCount;
 }
 
 
