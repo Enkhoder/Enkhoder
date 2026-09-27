@@ -49,7 +49,7 @@ const ICE_DOMINANT = isPrime(PUBLISH_MS);
 const GRADIENT_START = [(360 + 50) / 360, 0.5, 0.62];
 const GRADIENT_END = [350 / 360, 0.6, 0.62];
 const GRADIENT_LENGTH = 6;
-const FADE_STEPS = 85;
+const FADE_STEPS = 169;
 const PALETTE = {
     [FIRE]: trailOf(fireColor),
     [ICE]: trailOf(t => iceColor(1 - t))
