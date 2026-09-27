@@ -1,985 +1,1092 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
+
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Readme Game of Life</title>
-<style>
-:root[data-theme="dark"] {
-    --background: #0D1117;
-    --text: #E6EDF3;
-    --muted: #8B949E;
-    --button: #21262D;
-    --button-hover: #30363D;
-    --border: #30363D;
-    color-scheme: dark;
-}
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Readme Game of Life</title>
+    <style>
+        :root[data-theme="dark"] {
+            --background: #0D1117;
+            --text: #E6EDF3;
+            --muted: #8B949E;
+            --button: #21262D;
+            --button-hover: #30363D;
+            --border: #30363D;
+            --dot: #FFFFFF;
+            --empty: #151B23;
+            --track: #3B3B3B;
+            --track-border: #858585;
+            --raw: #FFFFFF;
+            color-scheme: dark;
+        }
 
-:root[data-theme="light"] {
-    --background: #FFFFFF;
-    --text: #1F2328;
-    --muted: #59636E;
-    --button: #F6F8FA;
-    --button-hover: #EFF2F5;
-    --border: #D1D9E0;
-    color-scheme: light;
-}
+        :root[data-theme="light"] {
+            --background: #FFFFFF;
+            --text: #1F2328;
+            --muted: #59636E;
+            --button: #F6F8FA;
+            --button-hover: #EFF2F5;
+            --border: #D1D9E0;
+            --dot: #000000;
+            --empty: #EFF2F5;
+            --track: #C4C4C4;
+            --track-border: #7A7A7A;
+            --raw: #000000;
+            color-scheme: light;
+        }
 
-body {
-    margin: 0;
-    min-height: 100vh;
-    display: grid;
-    place-content: center;
-    padding: 0 16px;
-    background: var(--background);
-    color: var(--text);
-    font: 18px system-ui, sans-serif;
-}
+        @property --background { syntax: '<color>'; inherits: true; initial-value: #0D1117; }
+        @property --text { syntax: '<color>'; inherits: true; initial-value: #E6EDF3; }
+        @property --muted { syntax: '<color>'; inherits: true; initial-value: #8B949E; }
+        @property --button { syntax: '<color>'; inherits: true; initial-value: #21262D; }
+        @property --button-hover { syntax: '<color>'; inherits: true; initial-value: #30363D; }
+        @property --border { syntax: '<color>'; inherits: true; initial-value: #30363D; }
+        @property --dot { syntax: '<color>'; inherits: true; initial-value: #FFFFFF; }
+        @property --empty { syntax: '<color>'; inherits: true; initial-value: #151B23; }
+        @property --track { syntax: '<color>'; inherits: true; initial-value: #3B3B3B; }
+        @property --track-border { syntax: '<color>'; inherits: true; initial-value: #858585; }
+        @property --raw { syntax: '<color>'; inherits: true; initial-value: #FFFFFF; }
 
-#app {
-    display: grid;
-    gap: 18px;
-    max-width: 100%;
-}
+        :root.theme-switching {
+            transition-property: --background, --text, --muted, --button, --button-hover, --border, --dot, --empty, --track,
+                --track-border, --raw;
+            transition-duration: var(--theme-duration);
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        }
 
-canvas {
-    max-width: 100%;
-}
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-content: center;
+            padding: 0 16px;
+            background: var(--background);
+            color: var(--text);
+            font: 18px system-ui, sans-serif;
+        }
 
-canvas.drawing {
-    cursor: crosshair;
-    touch-action: none;
-}
+        #app {
+            display: grid;
+            gap: 18px;
+            max-width: 100%;
+        }
 
-.controls {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    align-items: center;
-}
+        #board {
+            display: block;
+            max-width: 100%;
+            height: auto;
+        }
 
-button {
-    padding: 8px 18px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--button);
-    color: var(--text);
-    font: inherit;
-    cursor: pointer;
-}
+        #board .base {
+            fill: var(--empty);
+        }
 
-button:hover {
-    background: var(--button-hover);
-}
+        #board.drawing {
+            cursor: crosshair;
+            touch-action: none;
+        }
 
-button:disabled {
-    opacity: 0.5;
-    cursor: default;
-}
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+        }
 
-#roles {
-    min-width: 84px;
-}
+        button {
+            padding: 8px 18px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--button);
+            color: var(--text);
+            font: inherit;
+            cursor: pointer;
+        }
 
-#speed {
-    width: 260px;
-}
+        button:hover {
+            background: var(--button-hover);
+        }
 
-#fps {
-    white-space: pre;
-    font-variant-numeric: tabular-nums;
-}
+        button:disabled {
+            opacity: 0.5;
+            cursor: default;
+        }
 
-#toolbar {
-    align-items: flex-start;
-}
+        .stack {
+            display: inline-grid;
+            justify-items: center;
+        }
 
-.stats {
-    flex: 1;
-    min-width: 0;
-    color: var(--muted);
-    font-variant-numeric: tabular-nums;
-    line-height: normal;
-    text-align: right;
-}
+        .stack > span {
+            grid-area: 1 / 1;
+        }
 
-.stats > div {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: pre;
-}
+        .stack > span:not(.active) {
+            visibility: hidden;
+        }
 
-.fire {
-    color: #CEB430;
-}
+        #speed {
+            appearance: none;
+            width: 260px;
+            height: 8px;
+            margin: 0;
+            border: 1px solid var(--track-border);
+            border-radius: 4px;
+            background: linear-gradient(
+                to right,
+                var(--accent) calc(8px + (100% - 16px) * var(--ratio)),
+                var(--track) 0
+            );
+        }
 
-.ice {
-    color: #27A691;
-}
+        #speed::-webkit-slider-thumb {
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border: none;
+            border-radius: 50%;
+            background: var(--accent);
+        }
 
-.raw {
-    color: var(--text);
-}
-</style>
+        #speed::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border: none;
+            border-radius: 50%;
+            background: var(--accent);
+        }
+
+        #fps {
+            white-space: pre;
+            font-variant-numeric: tabular-nums;
+        }
+
+        #toolbar {
+            align-items: flex-start;
+        }
+
+        .stats {
+            flex: 1;
+            min-width: 0;
+            color: var(--muted);
+            font-variant-numeric: tabular-nums;
+            line-height: normal;
+            text-align: right;
+        }
+
+        .stats>div {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: pre;
+        }
+
+        .fire {
+            color: #CEB430;
+        }
+
+        .ice {
+            color: #27A691;
+        }
+
+        .raw {
+            color: var(--text);
+        }
+
+        .dot {
+            color: var(--dot);
+        }
+    </style>
 </head>
+
 <body>
 
 
 
-<!------ BOARD AND CONTROLS ------->
+    <!------ BOARD AND CONTROLS ------->
 
-<main id="app">
-    <canvas id="board"></canvas>
-    <div class="controls" id="toolbar">
-        <button id="play">Pause</button>
-        <button id="reseed">Reseed</button>
-        <button id="draw">Draw</button>
-        <button id="roles">Fire</button>
-        <button id="theme"></button>
-        <button id="clear" hidden>Clear</button>
-        <div class="stats">
-            <div id="status"></div>
-            <div id="details"></div>
+    <main id="app">
+        <svg id="board" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div class="controls" id="toolbar">
+            <button id="play">Pause</button>
+            <button id="reseed">Reseed</button>
+            <button id="draw">Draw</button>
+            <button id="roles"><span class="stack"><span>Fire</span><span>Ice</span><span>Raw</span></span></button>
+            <button id="theme"><span class="stack"><span>&#x2600;&#xFE0E;</span><span>&#x263E;&#xFE0E;</span></span></button>
+            <button id="clear" hidden>Clear</button>
+            <div class="stats">
+                <div id="status"></div>
+                <div id="details"></div>
+            </div>
         </div>
-    </div>
-    <div class="controls">
-        <label for="speed">Speed</label>
-        <input type="range" id="speed" min="1" max="300">
-        <span id="fps"></span>
-    </div>
-</main>
-
-
-
-<!------ SIMULATION ------->
-
-<script>
-//////// CONSTANTS ////////
-
-const ROWS = 7;
-const COLUMNS = 53;
-const CELL_COUNT = ROWS * COLUMNS;
-
-const FPS = 30;
-const LOOP_SECONDS = 60;
-const MAX_STEPS_PER_FRAME = 16;
-
-const CELL_SIZE = 10;
-const CELL_GAP = 3;
-const CELL_RADIUS = 2;
-const CELL_PITCH = CELL_SIZE + CELL_GAP;
-const DISPLAY_SCALE = 1.5;
-const EMPTY_DARK = '#151B23';
-const EMPTY_LIGHT = '#EFF2F5';
-const RAW_DARK = '#FFFFFF';
-const RAW_LIGHT = '#000000';
-const RAW_MODE = 2;
-const ROLE_MODES = 3;
-const FIGURE_SPACE = ' ';
-
-const FIRE = 1;
-const ICE = 2;
-const MUTATION_AGE = 9;
-const TYPE_SHIFT = 8;
-const SHADE_MASK = 255;
-const LIVE_MARK = FIRE << TYPE_SHIFT;
-const MAX_PERIOD = 15;
-const POPULATION_FLOOR = 0.1;
-const REFILL_DENSITY = 0.1;
-
-const GITHUB_USER = 'Enkhoder';
-const CONTRIBUTIONS_URL = `https://github-contributions-api.jogruber.de/v4/${GITHUB_USER}?y=last`;
-const REFRESH_MS = 60 * 60 * 1000;
-
-const GRADIENT_START = [(360 + 50) / 360, 0.5, 0.62];
-const GRADIENT_END = [350 / 360, 0.6, 0.62];
-const GRADIENT_LENGTH = 6;
-const FADE_STEPS = 169;
-const PALETTE = [null, trailOf(fireColor), trailOf(t => iceColor(1 - t))];
-
-const SURROUNDING = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]];
-
-
-
-//////// COLORS ////////
-
-function fireColor(t) {
-    const progress = Math.min(1, Math.max(0, t));
-    const [hue, lightness, saturation] = GRADIENT_START.map((start, i) => start + (GRADIENT_END[i] - start) * progress);
-    return toHex(hlsToRgb(wrap(hue, 1), lightness, saturation).map(channel => Math.trunc(channel * 255)));
-}
-
-
-function iceColor(t) {
-    return toHex(fireColor(t).slice(1).match(/../g).map(pair => 255 - parseInt(pair, 16)));
-}
-
-
-function hlsToRgb(hue, lightness, saturation) {
-    const high = lightness <= 0.5 ? lightness * (1 + saturation) : lightness + saturation - lightness * saturation;
-    const low = 2 * lightness - high;
-    return [hue + 1 / 3, hue, hue - 1 / 3].map(channelHue => hueChannel(low, high, wrap(channelHue, 1)));
-}
-
-
-function hueChannel(low, high, hue) {
-    if (hue < 1 / 6) {
-        return low + (high - low) * hue * 6;
-    }
-
-    if (hue < 0.5) {
-        return high;
-    }
-
-    if (hue < 2 / 3) {
-        return low + (high - low) * (2 / 3 - hue) * 6;
-    }
-
-    return low;
-}
-
-
-function trailOf(colorAt) {
-    const gradient = Array.from(
-        { length: GRADIENT_LENGTH },
-        (_, i) => colorAt((1 - Math.E / (Math.E + i)) / (1 - Math.E / (Math.E + GRADIENT_LENGTH - 1)))
-    );
-    const fade = Array.from(
-        { length: FADE_STEPS - 1 },
-        (_, i) => gradient.at(-1) + toHex([Math.floor(255 * Math.E / (Math.E + i + 1))]).slice(1)
-    );
-    return [...gradient, ...fade];
-}
-
-
-function toHex(bytes) {
-    return `#${bytes.map(byte => byte.toString(16).padStart(2, '0').toUpperCase()).join('')}`;
-}
-
-
-
-//////// STATE ////////
-
-let dayCount = 0;
-const exists = new Uint8Array(CELL_COUNT);
-let graphKey = '';
-const seenHashes = new Set();
-const ages = new Uint16Array(CELL_COUNT);
-const initial = new Uint16Array(CELL_COUNT);
-let current = new Uint16Array(CELL_COUNT);
-let scratch = new Uint16Array(CELL_COUNT);
-let endReason = '';
-let loops = 0;
-let loopFrame = 0;
-let refills = 0;
-let loopDate = '';
-let bornType = FIRE;
-let mutatedType = ICE;
-let graphDate = '';
-let graphRows = null;
-let roleMode = 0;
-let lightTheme = false;
-let lastEnd = '';
-let timer = 0;
-let fps = FPS;
-let lastTime = 0;
-let pendingSteps = 0;
-
-let drawing = false;
-let painting = false;
-let paintAlive = false;
-
-const app = document.getElementById('app');
-const canvas = document.getElementById('board');
-const context = canvas.getContext('2d');
-const playButton = document.getElementById('play');
-const drawButton = document.getElementById('draw');
-const clearButton = document.getElementById('clear');
-const speedInput = document.getElementById('speed');
-const fpsText = document.getElementById('fps');
-const rolesButton = document.getElementById('roles');
-const themeButton = document.getElementById('theme');
-const statusText = document.getElementById('status');
-const detailsText = document.getElementById('details');
-
-
-
-//////// CELL ENCODING ////////
-
-function typeOf(cell) {
-    return cell >> TYPE_SHIFT;
-}
-
-
-function shadeOf(cell) {
-    return cell & SHADE_MASK;
-}
-
-
-function makeCell(type, shade) {
-    return (type << TYPE_SHIFT) | shade;
-}
-
-
-function isAlive(cell) {
-    return cell !== 0 && shadeOf(cell) === 0;
-}
-
-
-function spawn(type) {
-    return makeCell(type, 0);
-}
-
-
-function fade(cell) {
-    return cell && shadeOf(cell) + 1 < PALETTE[typeOf(cell)].length ? cell + 1 : 0;
-}
-
-
-function wrap(value, size) {
-    return ((value % size) + size) % size;
-}
-
-
-function dayOf(index) {
-    return (index % COLUMNS) * ROWS + Math.floor(index / COLUMNS);
-}
-
-
-function indexOfDay(day) {
-    return (day % ROWS) * COLUMNS + Math.floor(day / ROWS);
-}
-
-
-function offsetIndex(index, rowOffset, columnOffset) {
-    return indexOfDay(wrap(dayOf(index) + rowOffset + columnOffset * ROWS, dayCount));
-}
-
-
-function applyDayCount(count) {
-    dayCount = count;
-    for (let index = 0; index < CELL_COUNT; index++) {
-        exists[index] = dayOf(index) < dayCount ? 1 : 0;
-    }
-}
-
-
-function hashState() {
-    let hash = 2166136261;
-    for (let i = 0; i < CELL_COUNT; i++) {
-        hash = Math.imul(hash ^ (isAlive(current[i]) ? 1 : 0), 16777619);
-    }
-
-    return hash >>> 0;
-}
-
-
-
-//////// RULES ////////
-
-function seed() {
-    const rows = graphRows ? graphRows.join('') : '';
-    for (let index = 0; index < CELL_COUNT; index++) {
-        current[index] = rows[index] === 'O' && exists[index] ? spawn(FIRE) : 0;
-        ages[index] = current[index] ? 1 : 0;
-    }
-
-    startLoop();
-}
-
-
-function startLoop() {
-    setLoopDate();
-    for (let index = 0; index < CELL_COUNT; index++) {
-        current[index] = isAlive(current[index]) ? spawn(bornType) : current[index];
-        ages[index] = isAlive(current[index]) ? 1 : 0;
-    }
-
-    initial.set(current);
-    loops = 0;
-    loopFrame = 0;
-    refills = 0;
-    lastEnd = '';
-    resetHistory();
-}
-
-
-function resetHistory() {
-    seenHashes.clear();
-    seenHashes.add(hashState());
-    endReason = endOf(false);
-}
-
-
-function endOf(repeated) {
-    const liveCount = current.filter(isAlive).length;
-    if (liveCount && settledGroups(current).flat().length === liveCount) {
-        return 'Stable';
-    }
-
-    return repeated ? 'Repeating' : '';
-}
-
-
-function aliveNext(source, index) {
-    if (!exists[index]) {
-        return false;
-    }
-
-    let neighbors = 0;
-    for (const [rowOffset, columnOffset] of SURROUNDING) {
-        neighbors += isAlive(source[offsetIndex(index, rowOffset, columnOffset)]) ? 1 : 0;
-    }
-
-    return neighbors === 3 || (neighbors === 2 && isAlive(source[index]));
-}
-
-
-function nextCell(source, index) {
-    const cell = source[index];
-    if (!aliveNext(source, index)) {
-        return fade(cell);
-    }
-
-    return isAlive(cell) ? cell : spawn(bornType);
-}
-
-
-function evolve(source, target) {
-    const mutating = [];
-    for (let index = 0; index < CELL_COUNT; index++) {
-        target[index] = nextCell(source, index);
-        ages[index] = isAlive(target[index]) ? ages[index] + 1 : 0;
-        if (ages[index] === MUTATION_AGE) {
-            mutating.push(index);
+        <div class="controls">
+            <label for="speed">Speed</label>
+            <input type="range" id="speed" min="1" max="300">
+            <span id="fps"></span>
+        </div>
+    </main>
+
+
+
+    <!------ SIMULATION ------->
+
+    <script>
+        //////// CONSTANTS ////////
+
+        const ROWS = 7;
+        const COLUMNS = 53;
+        const CELL_COUNT = ROWS * COLUMNS;
+
+        const FPS = 30;
+        const LOOP_SECONDS = 60;
+        const MAX_STEPS_PER_FRAME = 16;
+
+        const CELL_SIZE = 10;
+        const CELL_GAP = 3;
+        const CELL_RADIUS = 2;
+        const CELL_PITCH = CELL_SIZE + CELL_GAP;
+        const DISPLAY_SCALE = 1.5;
+        const RAW_COLOR = 'var(--raw)';
+        const RAW_MODE = 2;
+        const ROLE_MODES = 3;
+        const THEME_TRANSITION_MS = 400;
+        const SEPARATOR = '  <span class="dot">·</span>  ';
+        const SVG_NS = 'http://www.w3.org/2000/svg';
+        const FIGURE_SPACE = ' ';
+
+        const FIRE = 1;
+        const ICE = 2;
+        const MUTATION_AGE = 9;
+        const TYPE_SHIFT = 8;
+        const SHADE_MASK = 255;
+        const LIVE_MARK = FIRE << TYPE_SHIFT;
+        const MAX_PERIOD = 15;
+        const POPULATION_FLOOR = 0.1;
+        const REFILL_DENSITY = 0.1;
+
+        const GITHUB_USER = 'Enkhoder';
+        const CONTRIBUTIONS_URL = `https://github-contributions-api.jogruber.de/v4/${GITHUB_USER}?y=last`;
+        const REFRESH_MS = 60 * 60 * 1000;
+
+        const GRADIENT_START = [(360 + 50) / 360, 0.5, 0.62];
+        const GRADIENT_END = [350 / 360, 0.6, 0.62];
+        const GRADIENT_LENGTH = 6;
+        const FADE_STEPS = 169;
+        const PALETTE = [null, trailOf(fireColor), trailOf(t => iceColor(1 - t))];
+
+        const SURROUNDING = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]];
+
+
+
+        //////// COLORS ////////
+
+        function fireColor(t) {
+            const progress = Math.min(1, Math.max(0, t));
+            const [hue, lightness, saturation] = GRADIENT_START.map((start, i) => start + (GRADIENT_END[i] - start) * progress);
+            return toHex(hlsToRgb(wrap(hue, 1), lightness, saturation).map(channel => Math.trunc(channel * 255)));
         }
-    }
 
-    const doomed = new Set(mutating.length ? stillLifeCells(target, mutating) : []);
-    for (const index of doomed) {
-        target[index] = fade(spawn(mutatedType));
-        ages[index] = 0;
-    }
 
-    for (const index of mutating.filter(index => !doomed.has(index))) {
-        for (const nearby of [index, ...SURROUNDING.map(([row, column]) => offsetIndex(index, row, column))]) {
-            if (isAlive(target[nearby])) {
-                target[nearby] = spawn(mutatedType);
+        function iceColor(t) {
+            return toHex(fireColor(t).slice(1).match(/../g).map(pair => 255 - parseInt(pair, 16)));
+        }
+
+
+        function hlsToRgb(hue, lightness, saturation) {
+            const high = lightness <= 0.5 ? lightness * (1 + saturation) : lightness + saturation - lightness * saturation;
+            const low = 2 * lightness - high;
+            return [hue + 1 / 3, hue, hue - 1 / 3].map(channelHue => hueChannel(low, high, wrap(channelHue, 1)));
+        }
+
+
+        function hueChannel(low, high, hue) {
+            if (hue < 1 / 6) {
+                return low + (high - low) * hue * 6;
             }
-        }
-    }
-}
 
+            if (hue < 0.5) {
+                return high;
+            }
 
-function step() {
-    if (loopFrame + 1 >= LOOP_SECONDS * fps) {
-        setLoopDate();
-        for (let index = 0; index < CELL_COUNT; index++) {
-            initial[index] = isAlive(initial[index]) ? spawn(bornType) : 0;
-        }
+            if (hue < 2 / 3) {
+                return low + (high - low) * (2 / 3 - hue) * 6;
+            }
 
-        restart('60s loop');
-        loopFrame = 0;
-        refills = 0;
-        loops++;
-        return;
-    }
-
-    loopFrame++;
-    if (endReason) {
-        restart(endReason);
-        return;
-    }
-
-    evolve(current, scratch);
-    [current, scratch] = [scratch, current];
-    if (current.filter(isAlive).length <= POPULATION_FLOOR * dayCount) {
-        refill();
-    }
-
-    const hash = hashState();
-    const repeated = seenHashes.has(hash);
-    seenHashes.add(hash);
-    endReason = endOf(repeated);
-}
-
-
-function setLoopDate() {
-    loopDate = graphDate || new Date().toISOString().slice(0, 10);
-    const iceFirst = (Number(loopDate.slice(8, 10)) % 2 === 0) !== (roleMode === 1);
-    bornType = iceFirst ? ICE : FIRE;
-    mutatedType = iceFirst ? FIRE : ICE;
-    const label = roleMode === RAW_MODE ? 'Raw' : iceFirst ? 'Ice' : 'Fire';
-    rolesButton.textContent = label;
-    rolesButton.className = label.toLowerCase();
-    speedInput.style.accentColor = accentColor();
-}
-
-
-function restart(reason) {
-    for (let index = 0; index < CELL_COUNT; index++) {
-        current[index] = isAlive(initial[index]) ? initial[index] : fade(current[index]);
-        ages[index] = isAlive(initial[index]) ? 1 : 0;
-    }
-
-    lastEnd = `${reason} at gen ${loopFrame + 1}`;
-    resetHistory();
-}
-
-
-function refill() {
-    const bytes = hashBytes(`${loopDate}#${refills}`, dayCount);
-    refills++;
-    for (let day = 0; day < dayCount; day++) {
-        const index = indexOfDay(day);
-        if (bytes[day] < REFILL_DENSITY * 256 && !isAlive(current[index])) {
-            current[index] = spawn(bornType);
-            ages[index] = 1;
-        }
-    }
-}
-
-
-function hashBytes(text, count) {
-    const bytes = [];
-    for (let block = 0; bytes.length < count; block++) {
-        bytes.push(...sha1(`${text}#${block}`));
-    }
-
-    return bytes;
-}
-
-
-function sha1(text) {
-    const message = new TextEncoder().encode(text);
-    const words = new Uint32Array((((message.length + 8) >> 6) + 1) * 16);
-    message.forEach((byte, i) => {
-        words[i >> 2] |= byte << (24 - (i % 4) * 8);
-    });
-    words[message.length >> 2] |= 0x80 << (24 - (message.length % 4) * 8);
-    words[words.length - 1] = message.length * 8;
-
-    const hash = [0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0];
-    const schedule = new Uint32Array(80);
-    for (let block = 0; block < words.length; block += 16) {
-        for (let t = 0; t < 80; t++) {
-            schedule[t] = t < 16
-                ? words[block + t]
-                : rotate(schedule[t - 3] ^ schedule[t - 8] ^ schedule[t - 14] ^ schedule[t - 16], 1);
+            return low;
         }
 
-        let [a, b, c, d, e] = hash;
-        for (let t = 0; t < 80; t++) {
-            const [mix, constant] = roundFunction(t, b, c, d);
-            const next = (rotate(a, 5) + mix + e + constant + schedule[t]) >>> 0;
-            [e, d, c, b, a] = [d, c, rotate(b, 30), a, next];
+
+        function trailOf(colorAt) {
+            const gradient = Array.from(
+                { length: GRADIENT_LENGTH },
+                (_, i) => colorAt((1 - Math.E / (Math.E + i)) / (1 - Math.E / (Math.E + GRADIENT_LENGTH - 1)))
+            );
+            const fade = Array.from(
+                { length: FADE_STEPS - 1 },
+                (_, i) => gradient.at(-1) + toHex([Math.floor(255 * Math.E / (Math.E + i + 1))]).slice(1)
+            );
+            return [...gradient, ...fade];
         }
 
-        [a, b, c, d, e].forEach((value, i) => {
-            hash[i] = (hash[i] + value) >>> 0;
-        });
-    }
 
-    return hash.flatMap(value => [value >>> 24, (value >>> 16) & 255, (value >>> 8) & 255, value & 255]);
-}
-
-
-function roundFunction(t, b, c, d) {
-    if (t < 20) {
-        return [(b & c) | (~b & d), 0x5A827999];
-    }
-
-    if (t < 40) {
-        return [b ^ c ^ d, 0x6ED9EBA1];
-    }
-
-    if (t < 60) {
-        return [(b & c) | (b & d) | (c & d), 0x8F1BBCDC];
-    }
-
-    return [b ^ c ^ d, 0xCA62C1D6];
-}
-
-
-function rotate(value, bits) {
-    return ((value << bits) | (value >>> (32 - bits))) >>> 0;
-}
-
-
-
-//////// STILL LIFES AND OSCILLATORS ////////
-
-function lifeStep(source) {
-    const target = new Uint16Array(CELL_COUNT);
-    for (let index = 0; index < CELL_COUNT; index++) {
-        target[index] = aliveNext(source, index) ? LIVE_MARK : 0;
-    }
-
-    return target;
-}
-
-
-function futuresOf(cells, periods) {
-    const futures = [lifeStep(cells)];
-    while (futures.length < periods) {
-        futures.push(lifeStep(futures.at(-1)));
-    }
-
-    return futures;
-}
-
-
-function stillLifeCells(cells, mutating) {
-    return settledGroups(cells, 1)
-        .filter(members => members.some(({ index }) => mutating.includes(index)))
-        .flatMap(members => members.map(({ index }) => index));
-}
-
-
-function settledGroups(cells, periods = MAX_PERIOD) {
-    const futures = futuresOf(cells, periods);
-    const visited = new Uint8Array(CELL_COUNT);
-    const found = [];
-    for (let start = 0; start < CELL_COUNT; start++) {
-        if (visited[start] || !isAlive(cells[start])) {
-            continue;
+        function toHex(bytes) {
+            return `#${bytes.map(byte => byte.toString(16).padStart(2, '0').toUpperCase()).join('')}`;
         }
 
-        visited[start] = 1;
-        const members = [{ index: start, row: 0, column: 0 }];
-        for (let i = 0; i < members.length; i++) {
+
+
+        //////// STATE ////////
+
+        let dayCount = 0;
+        const exists = new Uint8Array(CELL_COUNT);
+        let graphKey = '';
+        const seenHashes = new Set();
+        const ages = new Uint16Array(CELL_COUNT);
+        const initial = new Uint16Array(CELL_COUNT);
+        let current = new Uint16Array(CELL_COUNT);
+        let scratch = new Uint16Array(CELL_COUNT);
+        let endReason = '';
+        let loops = 0;
+        let loopFrame = 0;
+        let refills = 0;
+        let loopDate = '';
+        let bornType = FIRE;
+        let mutatedType = ICE;
+        let graphDate = '';
+        let graphRows = null;
+        let roleMode = 0;
+        let lightTheme = false;
+        let lastEnd = '';
+        let timer = 0;
+        let fps = FPS;
+        let lastTime = 0;
+        let pendingSteps = 0;
+        let themeTimer = 0;
+
+        let drawing = false;
+        let painting = false;
+        let paintAlive = false;
+
+        const app = document.getElementById('app');
+        const board = document.getElementById('board');
+        const colorRects = new Array(CELL_COUNT).fill(null);
+        const playButton = document.getElementById('play');
+        const drawButton = document.getElementById('draw');
+        const clearButton = document.getElementById('clear');
+        const speedInput = document.getElementById('speed');
+        const fpsText = document.getElementById('fps');
+        const rolesButton = document.getElementById('roles');
+        const themeButton = document.getElementById('theme');
+        const statusText = document.getElementById('status');
+        const detailsText = document.getElementById('details');
+
+
+
+        //////// CELL ENCODING ////////
+
+        function typeOf(cell) {
+            return cell >> TYPE_SHIFT;
+        }
+
+
+        function shadeOf(cell) {
+            return cell & SHADE_MASK;
+        }
+
+
+        function makeCell(type, shade) {
+            return (type << TYPE_SHIFT) | shade;
+        }
+
+
+        function isAlive(cell) {
+            return cell !== 0 && shadeOf(cell) === 0;
+        }
+
+
+        function spawn(type) {
+            return makeCell(type, 0);
+        }
+
+
+        function fade(cell) {
+            return cell && shadeOf(cell) + 1 < PALETTE[typeOf(cell)].length ? cell + 1 : 0;
+        }
+
+
+        function wrap(value, size) {
+            return ((value % size) + size) % size;
+        }
+
+
+        function dayOf(index) {
+            return (index % COLUMNS) * ROWS + Math.floor(index / COLUMNS);
+        }
+
+
+        function indexOfDay(day) {
+            return (day % ROWS) * COLUMNS + Math.floor(day / ROWS);
+        }
+
+
+        function offsetIndex(index, rowOffset, columnOffset) {
+            return indexOfDay(wrap(dayOf(index) + rowOffset + columnOffset * ROWS, dayCount));
+        }
+
+
+        function applyDayCount(count) {
+            dayCount = count;
+            for (let index = 0; index < CELL_COUNT; index++) {
+                exists[index] = dayOf(index) < dayCount ? 1 : 0;
+            }
+
+            buildBoard();
+        }
+
+
+        function hashState() {
+            let hash = 2166136261;
+            for (let i = 0; i < CELL_COUNT; i++) {
+                hash = Math.imul(hash ^ (isAlive(current[i]) ? 1 : 0), 16777619);
+            }
+
+            return hash >>> 0;
+        }
+
+
+
+        //////// RULES ////////
+
+        function seed() {
+            const rows = graphRows ? graphRows.join('') : '';
+            for (let index = 0; index < CELL_COUNT; index++) {
+                current[index] = rows[index] === 'O' && exists[index] ? spawn(FIRE) : 0;
+                ages[index] = current[index] ? 1 : 0;
+            }
+
+            startLoop();
+        }
+
+
+        function startLoop() {
+            setLoopDate();
+            for (let index = 0; index < CELL_COUNT; index++) {
+                current[index] = isAlive(current[index]) ? spawn(bornType) : current[index];
+                ages[index] = isAlive(current[index]) ? 1 : 0;
+            }
+
+            initial.set(current);
+            loops = 0;
+            loopFrame = 0;
+            refills = 0;
+            lastEnd = '';
+            resetHistory();
+        }
+
+
+        function resetHistory() {
+            seenHashes.clear();
+            seenHashes.add(hashState());
+            endReason = endOf(false);
+        }
+
+
+        function endOf(repeated) {
+            const liveCount = current.filter(isAlive).length;
+            if (liveCount && settledGroups(current).flat().length === liveCount) {
+                return 'Stable';
+            }
+
+            return repeated ? 'Repeating' : '';
+        }
+
+
+        function aliveNext(source, index) {
+            if (!exists[index]) {
+                return false;
+            }
+
+            let neighbors = 0;
             for (const [rowOffset, columnOffset] of SURROUNDING) {
-                const neighbor = offsetIndex(members[i].index, rowOffset, columnOffset);
-                if (!visited[neighbor] && isAlive(cells[neighbor])) {
-                    visited[neighbor] = 1;
-                    members.push({ index: neighbor, row: members[i].row + rowOffset, column: members[i].column + columnOffset });
+                neighbors += isAlive(source[offsetIndex(index, rowOffset, columnOffset)]) ? 1 : 0;
+            }
+
+            return neighbors === 3 || (neighbors === 2 && isAlive(source[index]));
+        }
+
+
+        function nextCell(source, index) {
+            const cell = source[index];
+            if (!aliveNext(source, index)) {
+                return fade(cell);
+            }
+
+            return isAlive(cell) ? cell : spawn(bornType);
+        }
+
+
+        function evolve(source, target) {
+            const mutating = [];
+            for (let index = 0; index < CELL_COUNT; index++) {
+                target[index] = nextCell(source, index);
+                ages[index] = isAlive(target[index]) ? ages[index] + 1 : 0;
+                if (ages[index] === MUTATION_AGE) {
+                    mutating.push(index);
+                }
+            }
+
+            const doomed = new Set(mutating.length ? stillLifeCells(target, mutating) : []);
+            for (const index of doomed) {
+                target[index] = fade(spawn(mutatedType));
+                ages[index] = 0;
+            }
+
+            for (const index of mutating.filter(index => !doomed.has(index))) {
+                for (const nearby of [index, ...SURROUNDING.map(([row, column]) => offsetIndex(index, row, column))]) {
+                    if (isAlive(target[nearby])) {
+                        target[nearby] = spawn(mutatedType);
+                    }
                 }
             }
         }
 
-        const period = futures.findIndex(future => isRecurring(cells, future, members)) + 1;
-        if (period && oscillatesAlone(members, period, futures.length)) {
-            found.push(members);
-        }
-    }
 
-    return found;
-}
+        function step() {
+            if (loopFrame + 1 >= LOOP_SECONDS * fps) {
+                setLoopDate();
+                for (let index = 0; index < CELL_COUNT; index++) {
+                    initial[index] = isAlive(initial[index]) ? spawn(bornType) : 0;
+                }
 
-
-function isRecurring(cells, future, members) {
-    return members.every(({ index }) => [index, ...SURROUNDING.map(([row, column]) => offsetIndex(index, row, column))]
-        .every(nearby => isAlive(future[nearby]) === isAlive(cells[nearby])));
-}
-
-
-function oscillatesAlone(members, period, limit) {
-    const start = new Uint16Array(CELL_COUNT);
-    for (const { index } of members) {
-        start[index] = LIVE_MARK;
-    }
-
-    let alone = start;
-    for (let generation = 1; generation <= limit; generation++) {
-        alone = lifeStep(alone);
-        if (generation >= period && alone.every((cell, index) => cell === start[index])) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-
-
-//////// RENDERING ////////
-
-function setupCanvas() {
-    const scale = (window.devicePixelRatio || 1) * DISPLAY_SCALE;
-    const width = COLUMNS * CELL_PITCH - CELL_GAP;
-    const height = ROWS * CELL_PITCH - CELL_GAP;
-    canvas.width = width * scale;
-    canvas.height = height * scale;
-    canvas.style.width = `${width * DISPLAY_SCALE}px`;
-    app.style.width = canvas.style.width;
-    context.scale(scale, scale);
-}
-
-
-function rawColor() {
-    return lightTheme ? RAW_LIGHT : RAW_DARK;
-}
-
-
-function accentColor() {
-    return roleMode === RAW_MODE ? rawColor() : PALETTE[bornType][0];
-}
-
-
-function padded(value, width) {
-    return String(value).padStart(width, FIGURE_SPACE);
-}
-
-
-function draw() {
-    const raw = roleMode === RAW_MODE;
-    let fire = 0;
-    let ice = 0;
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    for (let index = 0; index < CELL_COUNT; index++) {
-        const cell = current[index];
-        if (!exists[index]) {
-            continue;
-        }
-
-        fire += isAlive(cell) && typeOf(cell) === FIRE ? 1 : 0;
-        ice += isAlive(cell) && typeOf(cell) === ICE ? 1 : 0;
-        context.beginPath();
-        context.roundRect(
-            (index % COLUMNS) * CELL_PITCH,
-            Math.floor(index / COLUMNS) * CELL_PITCH,
-            CELL_SIZE,
-            CELL_SIZE,
-            CELL_RADIUS
-        );
-        if (raw) {
-            context.strokeStyle = rawColor();
-            context.fillStyle = rawColor();
-            context.stroke();
-            if (isAlive(cell)) {
-                context.fill();
+                restart('60s loop');
+                loopFrame = 0;
+                refills = 0;
+                loops++;
+                return;
             }
 
-            continue;
+            loopFrame++;
+            if (endReason) {
+                restart(endReason);
+                return;
+            }
+
+            evolve(current, scratch);
+            [current, scratch] = [scratch, current];
+            if (current.filter(isAlive).length <= POPULATION_FLOOR * dayCount) {
+                refill();
+            }
+
+            const hash = hashState();
+            const repeated = seenHashes.has(hash);
+            seenHashes.add(hash);
+            endReason = endOf(repeated);
         }
 
-        context.fillStyle = lightTheme ? EMPTY_LIGHT : EMPTY_DARK;
-        context.fill();
-        if (cell) {
-            context.fillStyle = PALETTE[typeOf(cell)][shadeOf(cell)];
-            context.fill();
+
+        function setLoopDate() {
+            loopDate = graphDate || new Date().toISOString().slice(0, 10);
+            const iceFirst = (Number(loopDate.slice(8, 10)) % 2 === 0) !== (roleMode === 1);
+            bornType = iceFirst ? ICE : FIRE;
+            mutatedType = iceFirst ? FIRE : ICE;
+            const label = roleMode === RAW_MODE ? 'Raw' : iceFirst ? 'Ice' : 'Fire';
+            showLabel(rolesButton, label);
+            rolesButton.className = label.toLowerCase();
+            speedInput.style.setProperty('--accent', accentColor());
         }
-    }
-
-    const note = drawing ? 'Drawing' : endReason ? `${endReason}, restarting` : lastEnd && `Last restart: ${lastEnd}`;
-    const clock = `${padded((loopFrame / fps).toFixed(1), 4)} / ${LOOP_SECONDS}s`;
-    const counts = `<span class="fire">Fire ${padded(fire, 3)}</span> · <span class="ice">Ice ${padded(ice, 3)}</span>`;
-    statusText.innerHTML = `Gen ${padded(loopFrame + 1, 5)} · ${counts} · ${clock}`;
-    detailsText.textContent = `Refills ${refills}${note ? ` · ${note}` : ''}`;
-}
 
 
+        function restart(reason) {
+            for (let index = 0; index < CELL_COUNT; index++) {
+                current[index] = isAlive(initial[index]) ? initial[index] : fade(current[index]);
+                ages[index] = isAlive(initial[index]) ? 1 : 0;
+            }
 
-//////// DRAWING ////////
-
-function setDrawing(value) {
-    drawing = value;
-    drawButton.textContent = value ? 'Submit' : 'Draw';
-    clearButton.hidden = !value;
-    playButton.disabled = value;
-    canvas.classList.toggle('drawing', value);
-}
-
-
-function startDrawing() {
-    pause();
-    for (let index = 0; index < CELL_COUNT; index++) {
-        current[index] = isAlive(current[index]) ? current[index] : 0;
-    }
-
-    resetHistory();
-    setDrawing(true);
-    draw();
-}
+            lastEnd = `${reason} at gen ${loopFrame + 1}`;
+            resetHistory();
+        }
 
 
-function submitDrawing() {
-    startLoop();
-    setDrawing(false);
-    draw();
-    play();
-}
+        function refill() {
+            const bytes = hashBytes(`${loopDate}#${refills}`, dayCount);
+            refills++;
+            for (let day = 0; day < dayCount; day++) {
+                const index = indexOfDay(day);
+                if (bytes[day] < REFILL_DENSITY * 256 && !isAlive(current[index])) {
+                    current[index] = spawn(bornType);
+                    ages[index] = 1;
+                }
+            }
+        }
 
 
-function toggleRoles() {
-    roleMode = (roleMode + 1) % ROLE_MODES;
-    if (!drawing) {
+        function hashBytes(text, count) {
+            const bytes = [];
+            for (let block = 0; bytes.length < count; block++) {
+                bytes.push(...sha1(`${text}#${block}`));
+            }
+
+            return bytes;
+        }
+
+
+        function sha1(text) {
+            const message = new TextEncoder().encode(text);
+            const words = new Uint32Array((((message.length + 8) >> 6) + 1) * 16);
+            message.forEach((byte, i) => {
+                words[i >> 2] |= byte << (24 - (i % 4) * 8);
+            });
+            words[message.length >> 2] |= 0x80 << (24 - (message.length % 4) * 8);
+            words[words.length - 1] = message.length * 8;
+
+            const hash = [0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0];
+            const schedule = new Uint32Array(80);
+            for (let block = 0; block < words.length; block += 16) {
+                for (let t = 0; t < 80; t++) {
+                    schedule[t] = t < 16
+                        ? words[block + t]
+                        : rotate(schedule[t - 3] ^ schedule[t - 8] ^ schedule[t - 14] ^ schedule[t - 16], 1);
+                }
+
+                let [a, b, c, d, e] = hash;
+                for (let t = 0; t < 80; t++) {
+                    const [mix, constant] = roundFunction(t, b, c, d);
+                    const next = (rotate(a, 5) + mix + e + constant + schedule[t]) >>> 0;
+                    [e, d, c, b, a] = [d, c, rotate(b, 30), a, next];
+                }
+
+                [a, b, c, d, e].forEach((value, i) => {
+                    hash[i] = (hash[i] + value) >>> 0;
+                });
+            }
+
+            return hash.flatMap(value => [value >>> 24, (value >>> 16) & 255, (value >>> 8) & 255, value & 255]);
+        }
+
+
+        function roundFunction(t, b, c, d) {
+            if (t < 20) {
+                return [(b & c) | (~b & d), 0x5A827999];
+            }
+
+            if (t < 40) {
+                return [b ^ c ^ d, 0x6ED9EBA1];
+            }
+
+            if (t < 60) {
+                return [(b & c) | (b & d) | (c & d), 0x8F1BBCDC];
+            }
+
+            return [b ^ c ^ d, 0xCA62C1D6];
+        }
+
+
+        function rotate(value, bits) {
+            return ((value << bits) | (value >>> (32 - bits))) >>> 0;
+        }
+
+
+
+        //////// STILL LIFES AND OSCILLATORS ////////
+
+        function lifeStep(source) {
+            const target = new Uint16Array(CELL_COUNT);
+            for (let index = 0; index < CELL_COUNT; index++) {
+                target[index] = aliveNext(source, index) ? LIVE_MARK : 0;
+            }
+
+            return target;
+        }
+
+
+        function futuresOf(cells, periods) {
+            const futures = [lifeStep(cells)];
+            while (futures.length < periods) {
+                futures.push(lifeStep(futures.at(-1)));
+            }
+
+            return futures;
+        }
+
+
+        function stillLifeCells(cells, mutating) {
+            return settledGroups(cells, 1)
+                .filter(members => members.some(({ index }) => mutating.includes(index)))
+                .flatMap(members => members.map(({ index }) => index));
+        }
+
+
+        function settledGroups(cells, periods = MAX_PERIOD) {
+            const futures = futuresOf(cells, periods);
+            const visited = new Uint8Array(CELL_COUNT);
+            const found = [];
+            for (let start = 0; start < CELL_COUNT; start++) {
+                if (visited[start] || !isAlive(cells[start])) {
+                    continue;
+                }
+
+                visited[start] = 1;
+                const members = [{ index: start, row: 0, column: 0 }];
+                for (let i = 0; i < members.length; i++) {
+                    for (const [rowOffset, columnOffset] of SURROUNDING) {
+                        const neighbor = offsetIndex(members[i].index, rowOffset, columnOffset);
+                        if (!visited[neighbor] && isAlive(cells[neighbor])) {
+                            visited[neighbor] = 1;
+                            members.push({ index: neighbor, row: members[i].row + rowOffset, column: members[i].column + columnOffset });
+                        }
+                    }
+                }
+
+                const period = futures.findIndex(future => isRecurring(cells, future, members)) + 1;
+                if (period && oscillatesAlone(members, period, futures.length)) {
+                    found.push(members);
+                }
+            }
+
+            return found;
+        }
+
+
+        function isRecurring(cells, future, members) {
+            return members.every(({ index }) => [index, ...SURROUNDING.map(([row, column]) => offsetIndex(index, row, column))]
+                .every(nearby => isAlive(future[nearby]) === isAlive(cells[nearby])));
+        }
+
+
+        function oscillatesAlone(members, period, limit) {
+            const start = new Uint16Array(CELL_COUNT);
+            for (const { index } of members) {
+                start[index] = LIVE_MARK;
+            }
+
+            let alone = start;
+            for (let generation = 1; generation <= limit; generation++) {
+                alone = lifeStep(alone);
+                if (generation >= period && alone.every((cell, index) => cell === start[index])) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+
+
+        //////// RENDERING ////////
+
+        function setupBoard() {
+            const width = COLUMNS * CELL_PITCH - CELL_GAP;
+            const height = ROWS * CELL_PITCH - CELL_GAP;
+            board.setAttribute('viewBox', `0 0 ${width} ${height}`);
+            board.setAttribute('width', width * DISPLAY_SCALE);
+            board.setAttribute('height', height * DISPLAY_SCALE);
+            app.style.width = `${width * DISPLAY_SCALE}px`;
+        }
+
+
+        function cellRect(index, className) {
+            const rect = document.createElementNS(SVG_NS, 'rect');
+            rect.setAttribute('class', className);
+            rect.setAttribute('x', (index % COLUMNS) * CELL_PITCH);
+            rect.setAttribute('y', Math.floor(index / COLUMNS) * CELL_PITCH);
+            rect.setAttribute('width', CELL_SIZE);
+            rect.setAttribute('height', CELL_SIZE);
+            rect.setAttribute('rx', CELL_RADIUS);
+            board.appendChild(rect);
+            return rect;
+        }
+
+
+        function buildBoard() {
+            board.replaceChildren();
+            for (let index = 0; index < CELL_COUNT; index++) {
+                if (exists[index]) {
+                    cellRect(index, 'base');
+                }
+
+                colorRects[index] = exists[index] ? cellRect(index, 'color') : null;
+            }
+        }
+
+
+        function setFill(rect, color) {
+            if (rect.dataset.fill !== color) {
+                rect.dataset.fill = color;
+                rect.style.fill = color;
+            }
+        }
+
+
+        function accentColor() {
+            return roleMode === RAW_MODE ? RAW_COLOR : PALETTE[bornType][0];
+        }
+
+
+        function padded(value, width) {
+            return String(value).padStart(width, FIGURE_SPACE);
+        }
+
+
+        function showLabel(button, label) {
+            for (const span of button.querySelectorAll('.stack > span')) {
+                span.classList.toggle('active', span.textContent === label);
+            }
+        }
+
+
+        function draw() {
+            const raw = roleMode === RAW_MODE;
+            let fire = 0;
+            let ice = 0;
+            for (let index = 0; index < CELL_COUNT; index++) {
+                const cell = current[index];
+                if (!exists[index]) {
+                    continue;
+                }
+
+                fire += isAlive(cell) && typeOf(cell) === FIRE ? 1 : 0;
+                ice += isAlive(cell) && typeOf(cell) === ICE ? 1 : 0;
+                if (raw) {
+                    setFill(colorRects[index], isAlive(cell) ? RAW_COLOR : 'none');
+                    continue;
+                }
+
+                setFill(colorRects[index], cell ? PALETTE[typeOf(cell)][shadeOf(cell)] : 'none');
+            }
+
+            const note = drawing ? 'Drawing' : endReason ? `${endReason}, restarting` : lastEnd && `Last restart: ${lastEnd}`;
+            const clock = `${padded((loopFrame / fps).toFixed(1), 4)} / ${LOOP_SECONDS}s`;
+            const counts = `<span class="fire">Fire ${padded(fire, 3)}</span>${SEPARATOR}`
+                + `<span class="ice">Ice ${padded(ice, 3)}</span>`;
+            statusText.innerHTML = [`Gen ${padded(loopFrame + 1, 5)}`, counts, clock].join(SEPARATOR);
+            detailsText.innerHTML = [`Refills ${refills}`, note].filter(Boolean).join(SEPARATOR);
+        }
+
+
+
+        //////// DRAWING ////////
+
+        function setDrawing(value) {
+            drawing = value;
+            drawButton.textContent = value ? 'Submit' : 'Draw';
+            clearButton.hidden = !value;
+            playButton.disabled = value;
+            board.classList.toggle('drawing', value);
+        }
+
+
+        function startDrawing() {
+            pause();
+            for (let index = 0; index < CELL_COUNT; index++) {
+                current[index] = isAlive(current[index]) ? current[index] : 0;
+            }
+
+            resetHistory();
+            setDrawing(true);
+            draw();
+        }
+
+
+        function submitDrawing() {
+            startLoop();
+            setDrawing(false);
+            draw();
+            play();
+        }
+
+
+        function toggleRoles() {
+            const previousBorn = bornType;
+            roleMode = (roleMode + 1) % ROLE_MODES;
+            setLoopDate();
+            if (bornType !== previousBorn) {
+                swapTypes(current);
+                swapTypes(initial);
+            }
+
+            draw();
+        }
+
+
+        function swapTypes(cells) {
+            for (let index = 0; index < CELL_COUNT; index++) {
+                if (cells[index]) {
+                    cells[index] = makeCell(typeOf(cells[index]) === FIRE ? ICE : FIRE, shadeOf(cells[index]));
+                }
+            }
+        }
+
+
+        function clearBoard() {
+            current.fill(0);
+            ages.fill(0);
+            draw();
+        }
+
+
+        function cellFromPointer(event) {
+            const bounds = board.getBoundingClientRect();
+            const scale = (COLUMNS * CELL_PITCH - CELL_GAP) / bounds.width;
+            const row = Math.floor((event.clientY - bounds.top) * scale / CELL_PITCH);
+            const column = Math.floor((event.clientX - bounds.left) * scale / CELL_PITCH);
+            const inside = row >= 0 && row < ROWS && column >= 0 && column < COLUMNS;
+            return inside && exists[row * COLUMNS + column] ? row * COLUMNS + column : -1;
+        }
+
+
+        function paint(event) {
+            const index = cellFromPointer(event);
+            if (index < 0 || isAlive(current[index]) === paintAlive) {
+                return;
+            }
+
+            current[index] = paintAlive ? spawn(bornType) : 0;
+            ages[index] = paintAlive ? 1 : 0;
+            draw();
+        }
+
+
+        function startPainting(event) {
+            const index = cellFromPointer(event);
+            if (!drawing || index < 0) {
+                return;
+            }
+
+            paintAlive = !isAlive(current[index]);
+            painting = true;
+            board.setPointerCapture(event.pointerId);
+            paint(event);
+        }
+
+
+
+        //////// CONTRIBUTIONS ////////
+
+        async function loadContributions() {
+            let contributions;
+            try {
+                const response = await fetch(CONTRIBUTIONS_URL);
+                contributions = response.ok ? (await response.json()).contributions : null;
+            }
+
+            catch {
+                return;
+            }
+
+            const key = Array.isArray(contributions) ? contributions.map(day => (day.count > 0 ? 1 : 0)).join('') : '';
+            if (!key || key === graphKey || drawing) {
+                return;
+            }
+
+            graphKey = key;
+            applyContributions(contributions);
+        }
+
+
+        function applyContributions(contributions) {
+            graphDate = contributions.at(-1).date;
+            applyDayCount(contributions.length);
+            const pattern = new Array(CELL_COUNT).fill('.');
+            contributions.forEach((day, i) => {
+                pattern[indexOfDay(i)] = day.count > 0 ? 'O' : '.';
+            });
+            graphRows = Array.from({ length: ROWS }, (_, row) => pattern.slice(row * COLUMNS, (row + 1) * COLUMNS).join(''));
+            reseed();
+        }
+
+
+
+        //////// MAIN CONTROL FLOW ////////
+
+        function frame(time) {
+            pendingSteps = Math.min(pendingSteps + (time - lastTime) * fps / 1000, MAX_STEPS_PER_FRAME);
+            lastTime = time;
+            const steps = Math.floor(pendingSteps);
+            pendingSteps -= steps;
+            for (let i = 0; i < steps; i++) {
+                step();
+            }
+
+            if (steps) {
+                draw();
+            }
+
+            timer = requestAnimationFrame(frame);
+        }
+
+
+        function play() {
+            if (timer || drawing) {
+                return;
+            }
+
+            lastTime = performance.now();
+            pendingSteps = 0;
+            timer = requestAnimationFrame(frame);
+            playButton.textContent = 'Pause';
+        }
+
+
+        function pause() {
+            cancelAnimationFrame(timer);
+            timer = 0;
+            playButton.textContent = 'Play';
+        }
+
+
+        function setSpeed(value) {
+            fps = value;
+            speedInput.value = value;
+            speedInput.style.setProperty('--ratio', (value - speedInput.min) / (speedInput.max - speedInput.min));
+            fpsText.textContent = `${padded(value, 3)} fps`;
+            draw();
+        }
+
+
+        function setTheme(light, animated) {
+            const root = document.documentElement;
+            clearTimeout(themeTimer);
+            root.classList.toggle('theme-switching', animated);
+            themeTimer = setTimeout(() => root.classList.remove('theme-switching'), THEME_TRANSITION_MS);
+            lightTheme = light;
+            root.dataset.theme = light ? 'light' : 'dark';
+            showLabel(themeButton, light ? '☀︎' : '☾︎');
+            themeButton.setAttribute('aria-label', light ? 'Switch to dark mode' : 'Switch to light mode');
+            speedInput.style.setProperty('--accent', accentColor());
+            draw();
+        }
+
+
+        function reseed() {
+            pause();
+            setDrawing(false);
+            seed();
+            draw();
+            play();
+        }
+
+
+        playButton.addEventListener('click', () => (timer ? pause() : play()));
+        document.getElementById('reseed').addEventListener('click', reseed);
+        rolesButton.addEventListener('click', toggleRoles);
+        drawButton.addEventListener('click', () => (drawing ? submitDrawing() : startDrawing()));
+        themeButton.addEventListener('click', () => setTheme(!lightTheme, true));
+        clearButton.addEventListener('click', clearBoard);
+        speedInput.addEventListener('input', () => setSpeed(Number(speedInput.value)));
+        board.addEventListener('pointerdown', startPainting);
+        board.addEventListener('pointermove', event => (painting ? paint(event) : undefined));
+        board.addEventListener('pointerup', () => (painting = false));
+        board.addEventListener('pointercancel', () => (painting = false));
+
+        document.documentElement.style.setProperty('--theme-duration', `${THEME_TRANSITION_MS}ms`);
+        applyDayCount((COLUMNS - 1) * ROWS + new Date().getUTCDay() + 1);
+        setupBoard();
+        setSpeed(FPS);
+        setTheme(false, false);
         reseed();
-        return;
-    }
-
-    setLoopDate();
-    for (let index = 0; index < CELL_COUNT; index++) {
-        current[index] = isAlive(current[index]) ? spawn(bornType) : current[index];
-    }
-
-    draw();
-}
-
-
-function clearBoard() {
-    current.fill(0);
-    ages.fill(0);
-    draw();
-}
-
-
-function cellFromPointer(event) {
-    const bounds = canvas.getBoundingClientRect();
-    const scale = (COLUMNS * CELL_PITCH - CELL_GAP) / bounds.width;
-    const row = Math.floor((event.clientY - bounds.top) * scale / CELL_PITCH);
-    const column = Math.floor((event.clientX - bounds.left) * scale / CELL_PITCH);
-    const inside = row >= 0 && row < ROWS && column >= 0 && column < COLUMNS;
-    return inside && exists[row * COLUMNS + column] ? row * COLUMNS + column : -1;
-}
-
-
-function paint(event) {
-    const index = cellFromPointer(event);
-    if (index < 0 || isAlive(current[index]) === paintAlive) {
-        return;
-    }
-
-    current[index] = paintAlive ? spawn(bornType) : 0;
-    ages[index] = paintAlive ? 1 : 0;
-    draw();
-}
-
-
-function startPainting(event) {
-    const index = cellFromPointer(event);
-    if (!drawing || index < 0) {
-        return;
-    }
-
-    paintAlive = !isAlive(current[index]);
-    painting = true;
-    canvas.setPointerCapture(event.pointerId);
-    paint(event);
-}
-
-
-
-//////// CONTRIBUTIONS ////////
-
-async function loadContributions() {
-    let contributions;
-    try {
-        const response = await fetch(CONTRIBUTIONS_URL);
-        contributions = response.ok ? (await response.json()).contributions : null;
-    }
-
-    catch {
-        return;
-    }
-
-    const key = Array.isArray(contributions) ? contributions.map(day => (day.count > 0 ? 1 : 0)).join('') : '';
-    if (!key || key === graphKey || drawing) {
-        return;
-    }
-
-    graphKey = key;
-    applyContributions(contributions);
-}
-
-
-function applyContributions(contributions) {
-    graphDate = contributions.at(-1).date;
-    applyDayCount(contributions.length);
-    const pattern = new Array(CELL_COUNT).fill('.');
-    contributions.forEach((day, i) => {
-        pattern[indexOfDay(i)] = day.count > 0 ? 'O' : '.';
-    });
-    graphRows = Array.from({ length: ROWS }, (_, row) => pattern.slice(row * COLUMNS, (row + 1) * COLUMNS).join(''));
-    reseed();
-}
-
-
-
-//////// MAIN CONTROL FLOW ////////
-
-function frame(time) {
-    pendingSteps = Math.min(pendingSteps + (time - lastTime) * fps / 1000, MAX_STEPS_PER_FRAME);
-    lastTime = time;
-    const steps = Math.floor(pendingSteps);
-    pendingSteps -= steps;
-    for (let i = 0; i < steps; i++) {
-        step();
-    }
-
-    if (steps) {
-        draw();
-    }
-
-    timer = requestAnimationFrame(frame);
-}
-
-
-function play() {
-    if (timer || drawing) {
-        return;
-    }
-
-    lastTime = performance.now();
-    pendingSteps = 0;
-    timer = requestAnimationFrame(frame);
-    playButton.textContent = 'Pause';
-}
-
-
-function pause() {
-    cancelAnimationFrame(timer);
-    timer = 0;
-    playButton.textContent = 'Play';
-}
-
-
-function setSpeed(value) {
-    fps = value;
-    speedInput.value = value;
-    fpsText.textContent = `${padded(value, 3)} fps`;
-    draw();
-}
-
-
-function setTheme(light) {
-    lightTheme = light;
-    document.documentElement.dataset.theme = light ? 'light' : 'dark';
-    themeButton.textContent = light ? '☀︎' : '☾︎';
-    themeButton.setAttribute('aria-label', light ? 'Switch to dark mode' : 'Switch to light mode');
-    speedInput.style.accentColor = accentColor();
-    draw();
-}
-
-
-function reseed() {
-    pause();
-    setDrawing(false);
-    seed();
-    draw();
-    play();
-}
-
-
-playButton.addEventListener('click', () => (timer ? pause() : play()));
-document.getElementById('reseed').addEventListener('click', reseed);
-rolesButton.addEventListener('click', toggleRoles);
-drawButton.addEventListener('click', () => (drawing ? submitDrawing() : startDrawing()));
-themeButton.addEventListener('click', () => setTheme(!lightTheme));
-clearButton.addEventListener('click', clearBoard);
-speedInput.addEventListener('input', () => setSpeed(Number(speedInput.value)));
-canvas.addEventListener('pointerdown', startPainting);
-canvas.addEventListener('pointermove', event => (painting ? paint(event) : undefined));
-canvas.addEventListener('pointerup', () => (painting = false));
-canvas.addEventListener('pointercancel', () => (painting = false));
-
-applyDayCount((COLUMNS - 1) * ROWS + new Date().getUTCDay() + 1);
-setupCanvas();
-setSpeed(FPS);
-setTheme(false);
-reseed();
-loadContributions();
-setInterval(loadContributions, REFRESH_MS);
-</script>
+        loadContributions();
+        setInterval(loadContributions, REFRESH_MS);
+    </script>
 </body>
+
 </html>
