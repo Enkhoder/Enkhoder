@@ -9,7 +9,7 @@ const ROWS = 7;
 const COLUMNS = 53;
 const CELL_COUNT = ROWS * COLUMNS;
 
-const FPS = 15;
+const FPS = 30;
 const LOOP_FRAMES = 60 * FPS;
 
 const CELL_SIZE = 10;
