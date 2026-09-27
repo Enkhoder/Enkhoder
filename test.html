@@ -1,12 +1,28 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Readme Game of Life</title>
 <style>
-:root {
+:root[data-theme="dark"] {
+    --background: #0D1117;
+    --text: #E6EDF3;
+    --muted: #8B949E;
+    --button: #21262D;
+    --button-hover: #30363D;
+    --border: #30363D;
     color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+    --background: #FFFFFF;
+    --text: #1F2328;
+    --muted: #59636E;
+    --button: #F6F8FA;
+    --button-hover: #EFF2F5;
+    --border: #D1D9E0;
+    color-scheme: light;
 }
 
 body {
@@ -14,11 +30,16 @@ body {
     min-height: 100vh;
     display: grid;
     place-content: center;
-    gap: 18px;
     padding: 0 16px;
-    background: #0D1117;
-    color: #E6EDF3;
+    background: var(--background);
+    color: var(--text);
     font: 18px system-ui, sans-serif;
+}
+
+#app {
+    display: grid;
+    gap: 18px;
+    max-width: 100%;
 }
 
 canvas {
@@ -39,16 +60,16 @@ canvas.drawing {
 
 button {
     padding: 8px 18px;
-    border: 1px solid #30363D;
+    border: 1px solid var(--border);
     border-radius: 8px;
-    background: #21262D;
-    color: #E6EDF3;
+    background: var(--button);
+    color: var(--text);
     font: inherit;
     cursor: pointer;
 }
 
 button:hover {
-    background: #30363D;
+    background: var(--button-hover);
 }
 
 button:disabled {
@@ -56,24 +77,36 @@ button:disabled {
     cursor: default;
 }
 
-button[aria-pressed="true"] {
-    border-color: #CEB430;
+#roles {
+    min-width: 84px;
 }
 
 #speed {
     width: 260px;
-    accent-color: #CEB430;
 }
 
 #fps {
-    min-width: 64px;
+    white-space: pre;
     font-variant-numeric: tabular-nums;
 }
 
-#status {
-    margin-left: auto;
-    color: #8B949E;
+#toolbar {
+    align-items: flex-start;
+}
+
+.stats {
+    flex: 1;
+    min-width: 0;
+    color: var(--muted);
     font-variant-numeric: tabular-nums;
+    line-height: normal;
+    text-align: right;
+}
+
+.stats > div {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: pre;
 }
 
 .fire {
@@ -83,6 +116,10 @@ button[aria-pressed="true"] {
 .ice {
     color: #27A691;
 }
+
+.raw {
+    color: var(--text);
+}
 </style>
 </head>
 <body>
@@ -91,21 +128,26 @@ button[aria-pressed="true"] {
 
 <!------ BOARD AND CONTROLS ------->
 
-<canvas id="board"></canvas>
-<div class="controls">
-    <button id="play">Pause</button>
-    <button id="reseed">Reseed</button>
-    <button id="draw">Draw</button>
-    <button id="live" aria-pressed="false">Live draw: Off</button>
-    <button id="roles">Fire</button>
-    <button id="clear" hidden>Clear</button>
-    <span id="status"></span>
-</div>
-<div class="controls">
-    <label for="speed">Speed</label>
-    <input type="range" id="speed" min="1" max="300">
-    <span id="fps"></span>
-</div>
+<main id="app">
+    <canvas id="board"></canvas>
+    <div class="controls" id="toolbar">
+        <button id="play">Pause</button>
+        <button id="reseed">Reseed</button>
+        <button id="draw">Draw</button>
+        <button id="roles">Fire</button>
+        <button id="theme"></button>
+        <button id="clear" hidden>Clear</button>
+        <div class="stats">
+            <div id="status"></div>
+            <div id="details"></div>
+        </div>
+    </div>
+    <div class="controls">
+        <label for="speed">Speed</label>
+        <input type="range" id="speed" min="1" max="300">
+        <span id="fps"></span>
+    </div>
+</main>
 
 
 
@@ -127,13 +169,19 @@ const CELL_GAP = 3;
 const CELL_RADIUS = 2;
 const CELL_PITCH = CELL_SIZE + CELL_GAP;
 const DISPLAY_SCALE = 1.5;
-const EMPTY_COLOR = '#151B23';
+const EMPTY_DARK = '#151B23';
+const EMPTY_LIGHT = '#EFF2F5';
+const RAW_DARK = '#FFFFFF';
+const RAW_LIGHT = '#000000';
+const RAW_MODE = 2;
+const ROLE_MODES = 3;
+const FIGURE_SPACE = ' ';
 
 const FIRE = 1;
 const ICE = 2;
 const MUTATION_AGE = 9;
-const TYPE_SHIFT = 7;
-const SHADE_MASK = 127;
+const TYPE_SHIFT = 8;
+const SHADE_MASK = 255;
 const LIVE_MARK = FIRE << TYPE_SHIFT;
 const MAX_PERIOD = 15;
 const POPULATION_FLOOR = 0.1;
@@ -146,7 +194,7 @@ const REFRESH_MS = 60 * 60 * 1000;
 const GRADIENT_START = [(360 + 50) / 360, 0.5, 0.62];
 const GRADIENT_END = [350 / 360, 0.6, 0.62];
 const GRADIENT_LENGTH = 6;
-const FADE_STEPS = 85;
+const FADE_STEPS = 169;
 const PALETTE = [null, trailOf(fireColor), trailOf(t => iceColor(1 - t))];
 
 const SURROUNDING = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]];
@@ -229,7 +277,8 @@ let bornType = FIRE;
 let mutatedType = ICE;
 let graphDate = '';
 let graphRows = null;
-let rolesFlipped = false;
+let roleMode = 0;
+let lightTheme = false;
 let lastEnd = '';
 let timer = 0;
 let fps = FPS;
@@ -237,20 +286,21 @@ let lastTime = 0;
 let pendingSteps = 0;
 
 let drawing = false;
-let liveDrawing = false;
 let painting = false;
 let paintAlive = false;
 
+const app = document.getElementById('app');
 const canvas = document.getElementById('board');
 const context = canvas.getContext('2d');
 const playButton = document.getElementById('play');
 const drawButton = document.getElementById('draw');
-const liveButton = document.getElementById('live');
 const clearButton = document.getElementById('clear');
 const speedInput = document.getElementById('speed');
 const fpsText = document.getElementById('fps');
 const rolesButton = document.getElementById('roles');
+const themeButton = document.getElementById('theme');
 const statusText = document.getElementById('status');
+const detailsText = document.getElementById('details');
 
 
 
@@ -363,11 +413,7 @@ function resetHistory() {
 
 function endOf(repeated) {
     const liveCount = current.filter(isAlive).length;
-    if (liveCount === 0) {
-        return 'Extinct';
-    }
-
-    if (settledGroups(current).flat().length === liveCount) {
+    if (liveCount && settledGroups(current).flat().length === liveCount) {
         return 'Stable';
     }
 
@@ -460,11 +506,13 @@ function step() {
 
 function setLoopDate() {
     loopDate = graphDate || new Date().toISOString().slice(0, 10);
-    const iceFirst = (Number(loopDate.slice(8, 10)) % 2 === 0) !== rolesFlipped;
+    const iceFirst = (Number(loopDate.slice(8, 10)) % 2 === 0) !== (roleMode === 1);
     bornType = iceFirst ? ICE : FIRE;
     mutatedType = iceFirst ? FIRE : ICE;
-    rolesButton.textContent = iceFirst ? 'Ice' : 'Fire';
-    rolesButton.className = iceFirst ? 'ice' : 'fire';
+    const label = roleMode === RAW_MODE ? 'Raw' : iceFirst ? 'Ice' : 'Fire';
+    rolesButton.textContent = label;
+    rolesButton.className = label.toLowerCase();
+    speedInput.style.accentColor = accentColor();
 }
 
 
@@ -653,20 +701,37 @@ function setupCanvas() {
     canvas.width = width * scale;
     canvas.height = height * scale;
     canvas.style.width = `${width * DISPLAY_SCALE}px`;
+    app.style.width = canvas.style.width;
     context.scale(scale, scale);
 }
 
 
+function rawColor() {
+    return lightTheme ? RAW_LIGHT : RAW_DARK;
+}
+
+
+function accentColor() {
+    return roleMode === RAW_MODE ? rawColor() : PALETTE[bornType][0];
+}
+
+
+function padded(value, width) {
+    return String(value).padStart(width, FIGURE_SPACE);
+}
+
+
 function draw() {
+    const raw = roleMode === RAW_MODE;
     let fire = 0;
     let ice = 0;
     context.clearRect(0, 0, canvas.width, canvas.height);
     for (let index = 0; index < CELL_COUNT; index++) {
+        const cell = current[index];
         if (!exists[index]) {
             continue;
         }
 
-        const cell = current[index];
         fire += isAlive(cell) && typeOf(cell) === FIRE ? 1 : 0;
         ice += isAlive(cell) && typeOf(cell) === ICE ? 1 : 0;
         context.beginPath();
@@ -677,7 +742,18 @@ function draw() {
             CELL_SIZE,
             CELL_RADIUS
         );
-        context.fillStyle = EMPTY_COLOR;
+        if (raw) {
+            context.strokeStyle = rawColor();
+            context.fillStyle = rawColor();
+            context.stroke();
+            if (isAlive(cell)) {
+                context.fill();
+            }
+
+            continue;
+        }
+
+        context.fillStyle = lightTheme ? EMPTY_LIGHT : EMPTY_DARK;
         context.fill();
         if (cell) {
             context.fillStyle = PALETTE[typeOf(cell)][shadeOf(cell)];
@@ -686,9 +762,10 @@ function draw() {
     }
 
     const note = drawing ? 'Drawing' : endReason ? `${endReason}, restarting` : lastEnd && `Last restart: ${lastEnd}`;
-    const clock = `${(loopFrame / fps).toFixed(1)} / ${LOOP_SECONDS}s`;
-    const counts = `<span class="fire">Fire ${fire}</span> · <span class="ice">Ice ${ice}</span>`;
-    statusText.innerHTML = `Gen ${loopFrame + 1} · ${counts} · ${clock} · Refills ${refills}${note ? ` · ${note}` : ''}`;
+    const clock = `${padded((loopFrame / fps).toFixed(1), 4)} / ${LOOP_SECONDS}s`;
+    const counts = `<span class="fire">Fire ${padded(fire, 3)}</span> · <span class="ice">Ice ${padded(ice, 3)}</span>`;
+    statusText.innerHTML = `Gen ${padded(loopFrame + 1, 5)} · ${counts} · ${clock}`;
+    detailsText.textContent = `Refills ${refills}${note ? ` · ${note}` : ''}`;
 }
 
 
@@ -700,15 +777,7 @@ function setDrawing(value) {
     drawButton.textContent = value ? 'Submit' : 'Draw';
     clearButton.hidden = !value;
     playButton.disabled = value;
-    canvas.classList.toggle('drawing', drawing || liveDrawing);
-}
-
-
-function toggleLiveDrawing() {
-    liveDrawing = !liveDrawing;
-    liveButton.textContent = `Live draw: ${liveDrawing ? 'On' : 'Off'}`;
-    liveButton.setAttribute('aria-pressed', String(liveDrawing));
-    canvas.classList.toggle('drawing', drawing || liveDrawing);
+    canvas.classList.toggle('drawing', value);
 }
 
 
@@ -733,7 +802,7 @@ function submitDrawing() {
 
 
 function toggleRoles() {
-    rolesFlipped = !rolesFlipped;
+    roleMode = (roleMode + 1) % ROLE_MODES;
     if (!drawing) {
         reseed();
         return;
@@ -773,17 +842,13 @@ function paint(event) {
 
     current[index] = paintAlive ? spawn(bornType) : 0;
     ages[index] = paintAlive ? 1 : 0;
-    if (!drawing) {
-        resetHistory();
-    }
-
     draw();
 }
 
 
 function startPainting(event) {
     const index = cellFromPointer(event);
-    if (!(drawing || liveDrawing) || index < 0) {
+    if (!drawing || index < 0) {
         return;
     }
 
@@ -872,7 +937,17 @@ function pause() {
 function setSpeed(value) {
     fps = value;
     speedInput.value = value;
-    fpsText.textContent = `${value} fps`;
+    fpsText.textContent = `${padded(value, 3)} fps`;
+    draw();
+}
+
+
+function setTheme(light) {
+    lightTheme = light;
+    document.documentElement.dataset.theme = light ? 'light' : 'dark';
+    themeButton.textContent = light ? '☀︎' : '☾︎';
+    themeButton.setAttribute('aria-label', light ? 'Switch to dark mode' : 'Switch to light mode');
+    speedInput.style.accentColor = accentColor();
     draw();
 }
 
@@ -890,7 +965,7 @@ playButton.addEventListener('click', () => (timer ? pause() : play()));
 document.getElementById('reseed').addEventListener('click', reseed);
 rolesButton.addEventListener('click', toggleRoles);
 drawButton.addEventListener('click', () => (drawing ? submitDrawing() : startDrawing()));
-liveButton.addEventListener('click', toggleLiveDrawing);
+themeButton.addEventListener('click', () => setTheme(!lightTheme));
 clearButton.addEventListener('click', clearBoard);
 speedInput.addEventListener('input', () => setSpeed(Number(speedInput.value)));
 canvas.addEventListener('pointerdown', startPainting);
@@ -901,6 +976,7 @@ canvas.addEventListener('pointercancel', () => (painting = false));
 applyDayCount((COLUMNS - 1) * ROWS + new Date().getUTCDay() + 1);
 setupCanvas();
 setSpeed(FPS);
+setTheme(false);
 reseed();
 loadContributions();
 setInterval(loadContributions, REFRESH_MS);
