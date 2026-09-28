@@ -44,6 +44,8 @@ const REFILL_SEED_STRIDE = 10000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const GITHUB_USER = 'Enkhoder';
+const DENSE_GRAPH_SHARE = 0.5;
+const DENSE_SEED_LEVEL = 3;
 
 const PUBLISH_MS = Date.now();
 const ICE_DOMINANT = isPrime(PUBLISH_MS);
@@ -131,14 +133,16 @@ async function contributionGraph(username) {
     }
 
     const days = tags
-        .map(tag => ({ date: tag.match(/data-date="([^"]+)"/)[1], active: Number(tag.match(/data-level="(\d)"/)[1]) > 0 }))
+        .map(tag => ({ date: tag.match(/data-date="([^"]+)"/)[1], level: Number(tag.match(/data-level="(\d)"/)[1]) }))
         .sort((a, b) => a.date.localeCompare(b.date));
+    const activeDays = days.filter(day => day.level > 0).length;
+    const seedLevel = activeDays >= DENSE_GRAPH_SHARE * days.length ? DENSE_SEED_LEVEL : 1;
     const pattern = new Array(CELL_COUNT).fill('.');
     days.forEach((day, i) => {
-        pattern[indexOfDay(i)] = day.active ? 'O' : '.';
+        pattern[indexOfDay(i)] = day.level >= seedLevel ? 'O' : '.';
     });
     return {
-        name: `My graph · ${days.filter(day => day.active).length} active days`,
+        name: `My graph · ${activeDays} active days`,
         rows: Array.from({ length: ROWS }, (_, row) => pattern.slice(row * COLUMNS, (row + 1) * COLUMNS).join('')),
         dayCount: days.length,
         date: days.at(-1).date
