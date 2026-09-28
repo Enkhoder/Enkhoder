@@ -1,5 +1,4 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
 
 
 
@@ -40,6 +39,8 @@ const MUTATION_AGE = 9;
 const MAX_PERIOD = 15;
 const POPULATION_FLOOR = 0.1;
 const REFILL_DENSITY = 0.1;
+const REFILL_SEED_STRIDE = 10000;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 const GITHUB_USER = 'Enkhoder';
 
@@ -305,18 +306,29 @@ function simulateLoop(grid, start, seed, date) {
 
 
 function refill(grid, state, date, number) {
-    const bytes = createHash('shake256', { outputLength: grid.dayCount }).update(`${date}#${number}`).digest();
+    const random = splitmix32(Date.parse(date) / DAY_MS * REFILL_SEED_STRIDE + number);
     const cells = [...state.cells];
     const ages = [...state.ages];
     for (let day = 0; day < grid.dayCount; day++) {
         const index = indexOfDay(day);
-        if (bytes[day] < REFILL_DENSITY * 256 && !isAlive(cells[index])) {
+        if (random() < REFILL_DENSITY * 2 ** 32 && !isAlive(cells[index])) {
             cells[index] = spawn(rolesOf().born);
             ages[index] = 1;
         }
     }
 
     return { cells, ages };
+}
+
+
+function splitmix32(seed) {
+    let state = seed | 0;
+    return () => {
+        state = (state + 0x9E3779B9) | 0;
+        let mixed = Math.imul(state ^ (state >>> 16), 0x21F0AAAD);
+        mixed = Math.imul(mixed ^ (mixed >>> 15), 0x735A2D97);
+        return (mixed ^ (mixed >>> 15)) >>> 0;
+    };
 }
 
 
