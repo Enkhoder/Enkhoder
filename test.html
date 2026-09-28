@@ -264,6 +264,23 @@
         const POPULATION_FLOOR = 0.1;
         const REFILL_DENSITY = 0.1;
 
+        const SHAKE256_RATE = 136;
+        const KECCAK_ROTATIONS = [
+            0, 1, 62, 28, 27,
+            36, 44, 6, 55, 20,
+            3, 10, 43, 25, 39,
+            41, 45, 15, 21, 8,
+            18, 2, 61, 56, 14
+        ];
+        const KECCAK_ROUND_CONSTANTS = [
+            0x00000001, 0x00000000, 0x00008082, 0x00000000, 0x0000808A, 0x80000000, 0x80008000, 0x80000000,
+            0x0000808B, 0x00000000, 0x80000001, 0x00000000, 0x80008081, 0x80000000, 0x00008009, 0x80000000,
+            0x0000008A, 0x00000000, 0x00000088, 0x00000000, 0x80008009, 0x00000000, 0x8000000A, 0x00000000,
+            0x8000808B, 0x00000000, 0x0000008B, 0x80000000, 0x00008089, 0x80000000, 0x00008003, 0x80000000,
+            0x00008002, 0x80000000, 0x00000080, 0x80000000, 0x0000800A, 0x00000000, 0x8000000A, 0x80000000,
+            0x80008081, 0x80000000, 0x00008080, 0x80000000, 0x80000001, 0x00000000, 0x80008008, 0x80000000
+        ];
+
         const GITHUB_USER = 'Enkhoder';
         const CONTRIBUTIONS_URL = `https://github-contributions-api.jogruber.de/v4/${GITHUB_USER}?y=last`;
         const REFRESH_MS = 60 * 60 * 1000;
@@ -608,7 +625,7 @@
 
 
         function refill() {
-            const bytes = hashBytes(`${loopDate}#${refills}`, dayCount);
+            const bytes = shake256(`${loopDate}#${refills}`, dayCount);
             refills++;
             for (let day = 0; day < dayCount; day++) {
                 const index = indexOfDay(day);
@@ -620,69 +637,94 @@
         }
 
 
-        function hashBytes(text, count) {
-            const bytes = [];
-            for (let block = 0; bytes.length < count; block++) {
-                bytes.push(...sha1(`${text}#${block}`));
-            }
-
-            return bytes;
-        }
-
-
-        function sha1(text) {
+        function shake256(text, count) {
             const message = new TextEncoder().encode(text);
-            const words = new Uint32Array((((message.length + 8) >> 6) + 1) * 16);
-            message.forEach((byte, i) => {
-                words[i >> 2] |= byte << (24 - (i % 4) * 8);
-            });
-            words[message.length >> 2] |= 0x80 << (24 - (message.length % 4) * 8);
-            words[words.length - 1] = message.length * 8;
-
-            const hash = [0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0];
-            const schedule = new Uint32Array(80);
-            for (let block = 0; block < words.length; block += 16) {
-                for (let t = 0; t < 80; t++) {
-                    schedule[t] = t < 16
-                        ? words[block + t]
-                        : rotate(schedule[t - 3] ^ schedule[t - 8] ^ schedule[t - 14] ^ schedule[t - 16], 1);
+            const padded = new Uint8Array(Math.ceil((message.length + 1) / SHAKE256_RATE) * SHAKE256_RATE);
+            padded.set(message);
+            padded[message.length] ^= 0x1F;
+            padded[padded.length - 1] ^= 0x80;
+            const view = new DataView(padded.buffer);
+            const state = new Uint32Array(50);
+            for (let offset = 0; offset < padded.length; offset += SHAKE256_RATE) {
+                for (let word = 0; word < SHAKE256_RATE / 4; word++) {
+                    state[word] ^= view.getUint32(offset + word * 4, true);
                 }
 
-                let [a, b, c, d, e] = hash;
-                for (let t = 0; t < 80; t++) {
-                    const [mix, constant] = roundFunction(t, b, c, d);
-                    const next = (rotate(a, 5) + mix + e + constant + schedule[t]) >>> 0;
-                    [e, d, c, b, a] = [d, c, rotate(b, 30), a, next];
-                }
-
-                [a, b, c, d, e].forEach((value, i) => {
-                    hash[i] = (hash[i] + value) >>> 0;
-                });
+                keccak(state);
             }
 
-            return hash.flatMap(value => [value >>> 24, (value >>> 16) & 255, (value >>> 8) & 255, value & 255]);
+            const output = [];
+            for (;;) {
+                for (let word = 0; word < SHAKE256_RATE / 4; word++) {
+                    output.push(state[word] & 255, (state[word] >>> 8) & 255, (state[word] >>> 16) & 255, state[word] >>> 24);
+                }
+
+                if (output.length >= count) {
+                    return output.slice(0, count);
+                }
+
+                keccak(state);
+            }
         }
 
 
-        function roundFunction(t, b, c, d) {
-            if (t < 20) {
-                return [(b & c) | (~b & d), 0x5A827999];
-            }
+        function keccak(state) {
+            const columns = new Uint32Array(10);
+            const rotated = new Uint32Array(50);
+            for (let round = 0; round < 48; round += 2) {
+                for (let word = 0; word < 10; word++) {
+                    columns[word] = state[word] ^ state[word + 10] ^ state[word + 20] ^ state[word + 30] ^ state[word + 40];
+                }
 
-            if (t < 40) {
-                return [b ^ c ^ d, 0x6ED9EBA1];
-            }
+                for (let x = 0; x < 10; x += 2) {
+                    const next = (x + 2) % 10;
+                    const previous = (x + 8) % 10;
+                    const mixLow = columns[previous] ^ ((columns[next] << 1) | (columns[next + 1] >>> 31));
+                    const mixHigh = columns[previous + 1] ^ ((columns[next + 1] << 1) | (columns[next] >>> 31));
+                    for (let y = 0; y < 50; y += 10) {
+                        state[x + y] ^= mixLow;
+                        state[x + y + 1] ^= mixHigh;
+                    }
+                }
 
-            if (t < 60) {
-                return [(b & c) | (b & d) | (c & d), 0x8F1BBCDC];
-            }
+                for (let x = 0; x < 5; x++) {
+                    for (let y = 0; y < 5; y++) {
+                        const source = 2 * (x + 5 * y);
+                        const target = 2 * (y + 5 * ((2 * x + 3 * y) % 5));
+                        rotateInto(rotated, target, state[source], state[source + 1], KECCAK_ROTATIONS[x + 5 * y]);
+                    }
+                }
 
-            return [b ^ c ^ d, 0xCA62C1D6];
+                for (let y = 0; y < 50; y += 10) {
+                    for (let x = 0; x < 10; x++) {
+                        const half = x % 2;
+                        const lane = x - half;
+                        const after = y + (lane + 2) % 10 + half;
+                        const afterNext = y + (lane + 4) % 10 + half;
+                        state[y + x] = rotated[y + x] ^ (~rotated[after] & rotated[afterNext]);
+                    }
+                }
+
+                state[0] ^= KECCAK_ROUND_CONSTANTS[round];
+                state[1] ^= KECCAK_ROUND_CONSTANTS[round + 1];
+            }
         }
 
 
-        function rotate(value, bits) {
-            return ((value << bits) | (value >>> (32 - bits))) >>> 0;
+        function rotateInto(target, index, low, high, bits) {
+            if (bits >= 32) {
+                [low, high] = [high, low];
+                bits -= 32;
+            }
+
+            if (bits === 0) {
+                target[index] = low;
+                target[index + 1] = high;
+                return;
+            }
+
+            target[index] = (low << bits) | (high >>> (32 - bits));
+            target[index + 1] = (high << bits) | (low >>> (32 - bits));
         }
 
 
