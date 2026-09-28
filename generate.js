@@ -30,6 +30,7 @@ const OUTPUT_PATH = `${OUTPUT_DIR}/life.svg`;
 const PREVIEW_PATH = `${OUTPUT_DIR}/configurations.svg`;
 
 const LOOP_ID = 'l';
+const MAX_BEGIN_TIMES = 100;
 
 const DEAD = 0;
 const FIRE = 1;
@@ -475,44 +476,40 @@ function cellEvents(frames, index) {
 }
 
 
-function aliveAnimation(events, type, count) {
-    const begins = [];
-    const ends = [];
-    events.forEach((event, i) => {
-        if (!event.birth || event.type !== type) {
-            return;
-        }
-
-        begins.push(loopTime(event.frame));
-        if (i + 1 < events.length) {
-            ends.push(loopTime(events[i + 1].frame));
-            return;
-        }
-
-        begins.unshift(preLoopTime(event.frame, count));
-        ends.push(loopTime(events[0].frame), loopTime(count + events[0].frame));
-    });
-    if (!begins.length) {
-        return [];
-    }
-
-    return [`<set attributeName="fill" to="${PALETTE[type][0]}" begin="${begins.join(';')}" end="${ends.join(';')}"/>`];
+function isCarried(events, count) {
+    const last = events.at(-1);
+    return events[0].frame !== 0 && (last.birth || count - last.frame < PALETTE[last.type].length - 1);
 }
 
 
-function trailAnimation(events, type, count) {
-    const deaths = events.filter(event => !event.birth && event.type === type).map(event => event.frame);
-    if (!deaths.length) {
-        return [];
+function beginLists(events, type, birth, count) {
+    const last = events.at(-1);
+    const begins = events
+        .filter(event => event.type === type && event.birth === birth)
+        .map(event => loopTime(event.frame));
+    if (isCarried(events, count) && last.type === type && last.birth === birth) {
+        begins.unshift(preLoopTime(last.frame, count));
     }
 
-    const trail = PALETTE[type].slice(1);
-    const carried = deaths.at(-1) + trail.length > count ? [preLoopTime(deaths.at(-1), count)] : [];
-    const begins = [...carried, ...deaths.map(frame => loopTime(frame))];
-    return [
+    return Array.from(
+        { length: Math.ceil(begins.length / MAX_BEGIN_TIMES) },
+        (_, i) => begins.slice(i * MAX_BEGIN_TIMES, (i + 1) * MAX_BEGIN_TIMES)
+    );
+}
+
+
+function aliveAnimations(events, type, count) {
+    return beginLists(events, type, true, count)
+        .map(begins => `<set attributeName="fill" to="${PALETTE[type][0]}" begin="${begins.join(';')}"/>`);
+}
+
+
+function trailAnimations(events, type, count) {
+    const trail = [...PALETTE[type].slice(1), 'transparent'];
+    return beginLists(events, type, false, count).map(begins =>
         `<animate attributeName="fill" values="${trail.join(';')}" dur="${seconds(trail.length)}" calcMode="discrete"`
-        + ` begin="${begins.join(';')}"/>`
-    ];
+        + ` fill="freeze" begin="${begins.join(';')}"/>`
+    );
 }
 
 
@@ -528,8 +525,8 @@ function renderCell(frames, index) {
 
     const events = cellEvents(frames, index);
     const animations = [FIRE, ICE].flatMap(type => [
-        ...aliveAnimation(events, type, frames.length),
-        ...trailAnimation(events, type, frames.length)
+        ...aliveAnimations(events, type, frames.length),
+        ...trailAnimations(events, type, frames.length)
     ]);
     return `${base}\n<rect ${shape} fill="transparent">${animations.join('')}</rect>`;
 }
