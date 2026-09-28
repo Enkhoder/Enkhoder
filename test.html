@@ -221,7 +221,7 @@
         </div>
         <div class="controls">
             <label for="speed">Speed</label>
-            <input type="range" id="speed" min="1" max="300">
+            <input type="range" id="speed" min="1" max="30">
             <span id="fps"></span>
         </div>
     </main>
@@ -264,22 +264,8 @@
         const POPULATION_FLOOR = 0.1;
         const REFILL_DENSITY = 0.1;
 
-        const SHAKE256_RATE = 136;
-        const KECCAK_ROTATIONS = [
-            0, 1, 62, 28, 27,
-            36, 44, 6, 55, 20,
-            3, 10, 43, 25, 39,
-            41, 45, 15, 21, 8,
-            18, 2, 61, 56, 14
-        ];
-        const KECCAK_ROUND_CONSTANTS = [
-            0x00000001, 0x00000000, 0x00008082, 0x00000000, 0x0000808A, 0x80000000, 0x80008000, 0x80000000,
-            0x0000808B, 0x00000000, 0x80000001, 0x00000000, 0x80008081, 0x80000000, 0x00008009, 0x80000000,
-            0x0000008A, 0x00000000, 0x00000088, 0x00000000, 0x80008009, 0x00000000, 0x8000000A, 0x00000000,
-            0x8000808B, 0x00000000, 0x0000008B, 0x80000000, 0x00008089, 0x80000000, 0x00008003, 0x80000000,
-            0x00008002, 0x80000000, 0x00000080, 0x80000000, 0x0000800A, 0x00000000, 0x8000000A, 0x80000000,
-            0x80008081, 0x80000000, 0x00008080, 0x80000000, 0x80000001, 0x00000000, 0x80008008, 0x80000000
-        ];
+        const REFILL_SEED_STRIDE = 10000;
+        const DAY_MS = 24 * 60 * 60 * 1000;
 
         const GITHUB_USER = 'Enkhoder';
         const CONTRIBUTIONS_URL = `https://github-contributions-api.jogruber.de/v4/${GITHUB_USER}?y=last`;
@@ -603,7 +589,7 @@
 
         function setLoopDate() {
             loopDate = graphDate || new Date().toISOString().slice(0, 10);
-            const iceFirst = (Number(loopDate.slice(8, 10)) % 2 === 0) !== (roleMode === 1);
+            const iceFirst = roleMode === 1;
             bornType = iceFirst ? ICE : FIRE;
             mutatedType = iceFirst ? FIRE : ICE;
             const label = roleMode === RAW_MODE ? 'Raw' : iceFirst ? 'Ice' : 'Fire';
@@ -625,11 +611,11 @@
 
 
         function refill() {
-            const bytes = shake256(`${loopDate}#${refills}`, dayCount);
+            const random = splitmix32(Date.parse(loopDate) / DAY_MS * REFILL_SEED_STRIDE + refills);
             refills++;
             for (let day = 0; day < dayCount; day++) {
                 const index = indexOfDay(day);
-                if (bytes[day] < REFILL_DENSITY * 256 && !isAlive(current[index])) {
+                if (random() < REFILL_DENSITY * 2 ** 32 && !isAlive(current[index])) {
                     current[index] = spawn(bornType);
                     ages[index] = 1;
                 }
@@ -637,94 +623,14 @@
         }
 
 
-        function shake256(text, count) {
-            const message = new TextEncoder().encode(text);
-            const padded = new Uint8Array(Math.ceil((message.length + 1) / SHAKE256_RATE) * SHAKE256_RATE);
-            padded.set(message);
-            padded[message.length] ^= 0x1F;
-            padded[padded.length - 1] ^= 0x80;
-            const view = new DataView(padded.buffer);
-            const state = new Uint32Array(50);
-            for (let offset = 0; offset < padded.length; offset += SHAKE256_RATE) {
-                for (let word = 0; word < SHAKE256_RATE / 4; word++) {
-                    state[word] ^= view.getUint32(offset + word * 4, true);
-                }
-
-                keccak(state);
-            }
-
-            const output = [];
-            for (;;) {
-                for (let word = 0; word < SHAKE256_RATE / 4; word++) {
-                    output.push(state[word] & 255, (state[word] >>> 8) & 255, (state[word] >>> 16) & 255, state[word] >>> 24);
-                }
-
-                if (output.length >= count) {
-                    return output.slice(0, count);
-                }
-
-                keccak(state);
-            }
-        }
-
-
-        function keccak(state) {
-            const columns = new Uint32Array(10);
-            const rotated = new Uint32Array(50);
-            for (let round = 0; round < 48; round += 2) {
-                for (let word = 0; word < 10; word++) {
-                    columns[word] = state[word] ^ state[word + 10] ^ state[word + 20] ^ state[word + 30] ^ state[word + 40];
-                }
-
-                for (let x = 0; x < 10; x += 2) {
-                    const next = (x + 2) % 10;
-                    const previous = (x + 8) % 10;
-                    const mixLow = columns[previous] ^ ((columns[next] << 1) | (columns[next + 1] >>> 31));
-                    const mixHigh = columns[previous + 1] ^ ((columns[next + 1] << 1) | (columns[next] >>> 31));
-                    for (let y = 0; y < 50; y += 10) {
-                        state[x + y] ^= mixLow;
-                        state[x + y + 1] ^= mixHigh;
-                    }
-                }
-
-                for (let x = 0; x < 5; x++) {
-                    for (let y = 0; y < 5; y++) {
-                        const source = 2 * (x + 5 * y);
-                        const target = 2 * (y + 5 * ((2 * x + 3 * y) % 5));
-                        rotateInto(rotated, target, state[source], state[source + 1], KECCAK_ROTATIONS[x + 5 * y]);
-                    }
-                }
-
-                for (let y = 0; y < 50; y += 10) {
-                    for (let x = 0; x < 10; x++) {
-                        const half = x % 2;
-                        const lane = x - half;
-                        const after = y + (lane + 2) % 10 + half;
-                        const afterNext = y + (lane + 4) % 10 + half;
-                        state[y + x] = rotated[y + x] ^ (~rotated[after] & rotated[afterNext]);
-                    }
-                }
-
-                state[0] ^= KECCAK_ROUND_CONSTANTS[round];
-                state[1] ^= KECCAK_ROUND_CONSTANTS[round + 1];
-            }
-        }
-
-
-        function rotateInto(target, index, low, high, bits) {
-            if (bits >= 32) {
-                [low, high] = [high, low];
-                bits -= 32;
-            }
-
-            if (bits === 0) {
-                target[index] = low;
-                target[index + 1] = high;
-                return;
-            }
-
-            target[index] = (low << bits) | (high >>> (32 - bits));
-            target[index + 1] = (high << bits) | (low >>> (32 - bits));
+        function splitmix32(seed) {
+            let state = seed | 0;
+            return () => {
+                state = (state + 0x9E3779B9) | 0;
+                let mixed = Math.imul(state ^ (state >>> 16), 0x21F0AAAD);
+                mixed = Math.imul(mixed ^ (mixed >>> 15), 0x735A2D97);
+                return (mixed ^ (mixed >>> 15)) >>> 0;
+            };
         }
 
 
@@ -900,7 +806,7 @@
             const clock = `${padded((loopFrame / fps).toFixed(1), 4)} / ${LOOP_SECONDS}s`;
             const counts = `<span class="fire">Fire ${padded(fire, 3)}</span>${SEPARATOR}`
                 + `<span class="ice">Ice ${padded(ice, 3)}</span>`;
-            statusText.innerHTML = [`Gen ${padded(loopFrame + 1, 5)}`, counts, clock].join(SEPARATOR);
+            statusText.innerHTML = [`Gen ${padded(loopFrame + 1, 4)}`, counts, clock].join(SEPARATOR);
             detailsText.innerHTML = [`Refills ${refills}`, note].filter(Boolean).join(SEPARATOR);
         }
 
@@ -1080,7 +986,7 @@
             fps = value;
             speedInput.value = value;
             speedInput.style.setProperty('--ratio', (value - speedInput.min) / (speedInput.max - speedInput.min));
-            fpsText.textContent = `${padded(value, 3)} fps`;
+            fpsText.textContent = `${padded(value, 2)} fps`;
             draw();
         }
 
