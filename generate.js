@@ -305,7 +305,7 @@ function simulateLoop(grid, start, seed, date) {
 
 
 function refill(grid, state, date, number) {
-    const bytes = hashBytes(`${date}#${number}`, grid.dayCount);
+    const bytes = createHash('shake256', { outputLength: grid.dayCount }).update(`${date}#${number}`).digest();
     const cells = [...state.cells];
     const ages = [...state.ages];
     for (let day = 0; day < grid.dayCount; day++) {
@@ -317,16 +317,6 @@ function refill(grid, state, date, number) {
     }
 
     return { cells, ages };
-}
-
-
-function hashBytes(text, count) {
-    const bytes = [];
-    for (let block = 0; bytes.length < count; block++) {
-        bytes.push(...createHash('sha1').update(`${text}#${block}`).digest());
-    }
-
-    return bytes;
 }
 
 
