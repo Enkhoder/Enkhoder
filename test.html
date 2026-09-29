@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Readme Game of Life</title>
+    <title>Readme GoL Viewer</title>
     <style>
         :root[data-theme="dark"] {
             --background: #0D1117;
@@ -36,17 +36,71 @@
             color-scheme: light;
         }
 
-        @property --background { syntax: '<color>'; inherits: true; initial-value: #0D1117; }
-        @property --text { syntax: '<color>'; inherits: true; initial-value: #E6EDF3; }
-        @property --muted { syntax: '<color>'; inherits: true; initial-value: #8B949E; }
-        @property --button { syntax: '<color>'; inherits: true; initial-value: #21262D; }
-        @property --button-hover { syntax: '<color>'; inherits: true; initial-value: #30363D; }
-        @property --border { syntax: '<color>'; inherits: true; initial-value: #30363D; }
-        @property --dot { syntax: '<color>'; inherits: true; initial-value: #FFFFFF; }
-        @property --empty { syntax: '<color>'; inherits: true; initial-value: #151B23; }
-        @property --track { syntax: '<color>'; inherits: true; initial-value: #3B3B3B; }
-        @property --track-border { syntax: '<color>'; inherits: true; initial-value: #858585; }
-        @property --raw { syntax: '<color>'; inherits: true; initial-value: #FFFFFF; }
+        @property --background {
+            syntax: '<color>';
+            inherits: true;
+            initial-value: #0D1117;
+        }
+
+        @property --text {
+            syntax: '<color>';
+            inherits: true;
+            initial-value: #E6EDF3;
+        }
+
+        @property --muted {
+            syntax: '<color>';
+            inherits: true;
+            initial-value: #8B949E;
+        }
+
+        @property --button {
+            syntax: '<color>';
+            inherits: true;
+            initial-value: #21262D;
+        }
+
+        @property --button-hover {
+            syntax: '<color>';
+            inherits: true;
+            initial-value: #30363D;
+        }
+
+        @property --border {
+            syntax: '<color>';
+            inherits: true;
+            initial-value: #30363D;
+        }
+
+        @property --dot {
+            syntax: '<color>';
+            inherits: true;
+            initial-value: #FFFFFF;
+        }
+
+        @property --empty {
+            syntax: '<color>';
+            inherits: true;
+            initial-value: #151B23;
+        }
+
+        @property --track {
+            syntax: '<color>';
+            inherits: true;
+            initial-value: #3B3B3B;
+        }
+
+        @property --track-border {
+            syntax: '<color>';
+            inherits: true;
+            initial-value: #858585;
+        }
+
+        @property --raw {
+            syntax: '<color>';
+            inherits: true;
+            initial-value: #FFFFFF;
+        }
 
         :root.theme-switching {
             transition-property: --background, --text, --muted, --button, --button-hover, --border, --dot, --empty, --track,
@@ -118,11 +172,11 @@
             justify-items: center;
         }
 
-        .stack > span {
+        .stack>span {
             grid-area: 1 / 1;
         }
 
-        .stack > span:not(.active) {
+        .stack>span:not(.active) {
             visibility: hidden;
         }
 
@@ -133,11 +187,9 @@
             margin: 0;
             border: 1px solid var(--track-border);
             border-radius: 4px;
-            background: linear-gradient(
-                to right,
-                var(--accent) calc(8px + (100% - 16px) * var(--ratio)),
-                var(--track) 0
-            );
+            background: linear-gradient(to right,
+                    var(--accent) calc(8px + (100% - 16px) * var(--ratio)),
+                    var(--track) 0);
         }
 
         #speed::-webkit-slider-thumb {
@@ -212,7 +264,8 @@
             <button id="reseed">Reseed</button>
             <button id="draw">Draw</button>
             <button id="roles"><span class="stack"><span>Fire</span><span>Ice</span><span>Raw</span></span></button>
-            <button id="theme"><span class="stack"><span>&#x2600;&#xFE0E;</span><span>&#x263E;&#xFE0E;</span></span></button>
+            <button id="theme"><span
+                    class="stack"><span>&#x2600;&#xFE0E;</span><span>&#x263E;&#xFE0E;</span></span></button>
             <button id="clear" hidden>Clear</button>
             <div class="stats">
                 <div id="status"></div>
