@@ -221,7 +221,7 @@
         </div>
         <div class="controls">
             <label for="speed">Speed</label>
-            <input type="range" id="speed" min="1" max="30">
+            <input type="range" id="speed" min="0">
             <span id="fps"></span>
         </div>
     </main>
@@ -237,9 +237,15 @@
         const COLUMNS = 53;
         const CELL_COUNT = ROWS * COLUMNS;
 
-        const FPS = 30;
+        const FPS = 15;
         const LOOP_SECONDS = 60;
+        const LOOP_FRAMES = LOOP_SECONDS * FPS;
         const MAX_STEPS_PER_FRAME = 16;
+        const SPEED_STEPS = [
+            ...Array.from({ length: 30 }, (_, i) => 1 + i),
+            ...Array.from({ length: 7 }, (_, i) => 40 + 10 * i),
+            ...Array.from({ length: 4 }, (_, i) => 150 + 50 * i)
+        ];
 
         const CELL_SIZE = 10;
         const CELL_GAP = 3;
@@ -256,7 +262,7 @@
 
         const FIRE = 1;
         const ICE = 2;
-        const MUTATION_AGE = 9;
+        const MUTATION_AGE = 6;
         const TYPE_SHIFT = 8;
         const SHADE_MASK = 255;
         const LIVE_MARK = FIRE << TYPE_SHIFT;
@@ -274,7 +280,7 @@
         const GRADIENT_START = [(360 + 50) / 360, 0.5, 0.62];
         const GRADIENT_END = [350 / 360, 0.6, 0.62];
         const GRADIENT_LENGTH = 6;
-        const FADE_STEPS = 169;
+        const FADE_STEPS = 85;
         const PALETTE = [null, trailOf(fireColor), trailOf(t => iceColor(1 - t))];
 
         const SURROUNDING = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]];
@@ -322,11 +328,11 @@
         function trailOf(colorAt) {
             const gradient = Array.from(
                 { length: GRADIENT_LENGTH },
-                (_, i) => colorAt((1 - Math.E / (Math.E + i)) / (1 - Math.E / (Math.E + GRADIENT_LENGTH - 1)))
+                (_, i) => colorAt((1 - 1 / (1 + i)) / (1 - 1 / (1 + GRADIENT_LENGTH - 1)))
             );
             const fade = Array.from(
                 { length: FADE_STEPS - 1 },
-                (_, i) => gradient.at(-1) + toHex([Math.floor(255 * Math.E / (Math.E + i + 1))]).slice(1)
+                (_, i) => gradient.at(-1) + toHex([Math.floor(255 / (1 + i + 1))]).slice(1)
             );
             return [...gradient, ...fade];
         }
@@ -555,7 +561,7 @@
 
 
         function step() {
-            if (loopFrame + 1 >= LOOP_SECONDS * fps) {
+            if (loopFrame + 1 >= LOOP_FRAMES) {
                 setLoopDate();
                 for (let index = 0; index < CELL_COUNT; index++) {
                     initial[index] = isAlive(initial[index]) ? spawn(bornType) : 0;
@@ -803,7 +809,7 @@
             }
 
             const note = drawing ? 'Drawing' : endReason ? `${endReason}, restarting` : lastEnd && `Last restart: ${lastEnd}`;
-            const clock = `${padded((loopFrame / fps).toFixed(1), 4)} / ${LOOP_SECONDS}s`;
+            const clock = `${padded((loopFrame / FPS).toFixed(1), 4)} / ${LOOP_SECONDS}s`;
             const counts = `<span class="fire">Fire ${padded(fire, 3)}</span>${SEPARATOR}`
                 + `<span class="ice">Ice ${padded(ice, 3)}</span>`;
             statusText.innerHTML = [`Gen ${padded(loopFrame + 1, 4)}`, counts, clock].join(SEPARATOR);
@@ -984,9 +990,9 @@
 
         function setSpeed(value) {
             fps = value;
-            speedInput.value = value;
-            speedInput.style.setProperty('--ratio', (value - speedInput.min) / (speedInput.max - speedInput.min));
-            fpsText.textContent = `${padded(value, 2)} fps`;
+            speedInput.value = SPEED_STEPS.indexOf(value);
+            speedInput.style.setProperty('--ratio', speedInput.value / speedInput.max);
+            fpsText.textContent = `${padded(value, 3)} fps`;
             draw();
         }
 
@@ -1020,7 +1026,7 @@
         drawButton.addEventListener('click', () => (drawing ? submitDrawing() : startDrawing()));
         themeButton.addEventListener('click', () => setTheme(!lightTheme, true));
         clearButton.addEventListener('click', clearBoard);
-        speedInput.addEventListener('input', () => setSpeed(Number(speedInput.value)));
+        speedInput.addEventListener('input', () => setSpeed(SPEED_STEPS[Number(speedInput.value)]));
         board.addEventListener('pointerdown', startPainting);
         board.addEventListener('pointermove', event => (painting ? paint(event) : undefined));
         board.addEventListener('pointerup', () => (painting = false));
@@ -1029,6 +1035,7 @@
         document.documentElement.style.setProperty('--theme-duration', `${THEME_TRANSITION_MS}ms`);
         applyDayCount((COLUMNS - 1) * ROWS + new Date().getUTCDay() + 1);
         setupBoard();
+        speedInput.max = SPEED_STEPS.length - 1;
         setSpeed(FPS);
         setTheme(false, false);
         reseed();

@@ -8,7 +8,7 @@ const ROWS = 7;
 const COLUMNS = 53;
 const CELL_COUNT = ROWS * COLUMNS;
 
-const FPS = 30;
+const FPS = 15;
 const LOOP_FRAMES = 60 * FPS;
 
 const CELL_SIZE = 10;
@@ -31,12 +31,13 @@ const PREVIEW_PATH = `${OUTPUT_DIR}/configurations.svg`;
 
 const LOOP_ID = 'l';
 const MAX_BEGIN_TIMES = 100;
+const KEY_TIME_DIGITS = 6;
 
 const DEAD = 0;
 const FIRE = 1;
 const ICE = 2;
 const DEAD_CELL = { type: DEAD, shade: 0 };
-const MUTATION_AGE = 9;
+const MUTATION_AGE = 6;
 const MAX_PERIOD = 15;
 const POPULATION_FLOOR = 0.1;
 const REFILL_DENSITY = 0.1;
@@ -53,7 +54,7 @@ const ICE_DOMINANT = isPrime(PUBLISH_MS);
 const GRADIENT_START = [(360 + 50) / 360, 0.5, 0.62];
 const GRADIENT_END = [350 / 360, 0.6, 0.62];
 const GRADIENT_LENGTH = 6;
-const FADE_STEPS = 169;
+const FADE_STEPS = 85;
 const PALETTE = {
     [FIRE]: trailOf(fireColor),
     [ICE]: trailOf(t => iceColor(1 - t))
@@ -103,11 +104,11 @@ function hueChannel(low, high, hue) {
 function trailOf(colorAt) {
     const gradient = Array.from(
         { length: GRADIENT_LENGTH },
-        (_, i) => colorAt((1 - Math.E / (Math.E + i)) / (1 - Math.E / (Math.E + GRADIENT_LENGTH - 1)))
+        (_, i) => colorAt((1 - 1 / (1 + i)) / (1 - 1 / (1 + GRADIENT_LENGTH - 1)))
     );
     const fade = Array.from(
         { length: FADE_STEPS - 1 },
-        (_, i) => gradient.at(-1) + toHex([Math.floor(255 * Math.E / (Math.E + i + 1))]).slice(1)
+        (_, i) => gradient.at(-1) + toHex([Math.floor(255 / (1 + i + 1))]).slice(1)
     );
     return [...gradient, ...fade];
 }
@@ -510,8 +511,11 @@ function aliveAnimations(events, type, count) {
 
 function trailAnimations(events, type, count) {
     const trail = [...PALETTE[type].slice(1), 'transparent'];
+    const changes = trail.flatMap((color, frame) => (color === trail[frame - 1] ? [] : [frame]));
+    const keyTimes = changes.map(frame => +(frame / trail.length).toFixed(KEY_TIME_DIGITS));
     return beginLists(events, type, false, count).map(begins =>
-        `<animate attributeName="fill" values="${trail.join(';')}" dur="${seconds(trail.length)}" calcMode="discrete"`
+        `<animate attributeName="fill" values="${changes.map(frame => trail[frame]).join(';')}"`
+        + ` keyTimes="${keyTimes.join(';')}" dur="${seconds(trail.length)}" calcMode="discrete"`
         + ` fill="freeze" begin="${begins.join(';')}"/>`
     );
 }
