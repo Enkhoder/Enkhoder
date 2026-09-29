@@ -37,7 +37,7 @@ jobs:
           chmod 600 ~/.ssh/archive_key
           echo "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" >> ~/.ssh/known_hosts
           export GIT_SSH_COMMAND="ssh -i ~/.ssh/archive_key -o IdentitiesOnly=yes"
-          git clone -q --depth 1 git@github.com:Enkhoder/GOL-contrib-graph-archive.git "$RUNNER_TEMP/archive"
+          git clone -q --depth 1 git@github.com:Enkhoder/GoL-contrib-graph-archive.git "$RUNNER_TEMP/archive"
           cd "$RUNNER_TEMP/archive"
           mkdir -p archive
           if grep -rqF "data-epoch=\"$epoch\"" archive; then
