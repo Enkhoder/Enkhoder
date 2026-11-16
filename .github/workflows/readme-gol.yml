@@ -45,6 +45,7 @@ jobs:
             exit 0
           fi
 
+          name="${name}_$(( $(find archive -name '*.svg' | wc -l) + 1 ))"
           if [ "$(factor "$epoch" | wc -w)" -eq 2 ]; then
             name="${name}_Prime_$(( $(find archive -name '*_Prime_*.svg' | wc -l) + 1 ))"
           fi
