@@ -39,20 +39,19 @@ jobs:
           export GIT_SSH_COMMAND="ssh -i ~/.ssh/archive_key -o IdentitiesOnly=yes"
           git clone -q --depth 1 git@github.com:Enkhoder/GoL-contrib-graph-archive.git "$RUNNER_TEMP/archive"
           cd "$RUNNER_TEMP/archive"
-          mkdir -p archive
-          if grep -rqF "data-epoch=\"$epoch\"" archive; then
+          if grep -qsF "data-epoch=\"$epoch\"" ./*.svg; then
             echo "data-epoch $epoch already archived"
             exit 0
           fi
 
-          name="${name}_$(( $(find archive -name '*.svg' | wc -l) + 1 ))"
+          name="${name}_$(( $(find . -maxdepth 1 -name '*.svg' | wc -l) + 1 ))"
           if [ "$(factor "$epoch" | wc -w)" -eq 2 ]; then
-            name="${name}_Prime_$(( $(find archive -name '*_Prime_*.svg' | wc -l) + 1 ))"
+            name="${name}_Prime_$(( $(find . -maxdepth 1 -name '*_Prime_*.svg' | wc -l) + 1 ))"
           fi
 
-          sed "1s/ data-epoch=\"$epoch\"/& data-delay=\"$delayMs\"/" "$GITHUB_WORKSPACE/dist/life.svg" > "archive/$name.svg"
+          sed "1s/ data-epoch=\"$epoch\"/& data-delay=\"$delayMs\"/" "$GITHUB_WORKSPACE/dist/life.svg" > "$name.svg"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "archive/$name.svg"
+          git add "$name.svg"
           git commit -m "$delay"
           git push
